@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-The latest minor release receives fixes. mist is pre-1.0, so a fix ships as a new release rather than a backport.
+The latest minor release receives fixes. A fix ships as a new release rather than a backport.
 
 ## Reporting a vulnerability
 
