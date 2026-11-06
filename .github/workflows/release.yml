@@ -74,4 +74,4 @@ jobs:
           gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/mist_${GITHUB_REF_NAME#v}.intoto.jsonl" -R "$GITHUB_REPOSITORY"
           gh release edit "$GITHUB_REF_NAME" --draft=false -R "$GITHUB_REPOSITORY"
       - name: warm the Go module proxy
-        run: curl -fsS "https://proxy.golang.org/github.com/hownowstephen/mist/@v/${GITHUB_REF_NAME}.info"
+        run: curl -fsS "https://proxy.golang.org/github.com/customerio/mist/@v/${GITHUB_REF_NAME}.info"
