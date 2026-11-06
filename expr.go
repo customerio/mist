@@ -2,6 +2,7 @@ package mist
 
 import (
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf16"
@@ -415,6 +416,9 @@ func (r *renderer) path(eval, lenient bool) any {
 		switch r.peek() {
 		case '.':
 			if strings.HasPrefix(r.src[r.p:], "..") {
+				if depth == 0 {
+					r.read(name, "", true)
+				}
 				return v // a range's dots end the path, as in liquidjs
 			}
 			r.p++
@@ -426,6 +430,9 @@ func (r *renderer) path(eval, lenient bool) any {
 			seg := src[i:j]
 			if seg == "" || j < len(src) && src[j] >= utf8.RuneSelf && !r.blankAt(j) {
 				bail(at, "expected-property-name", "expected property name")
+			}
+			if depth == 0 {
+				r.read(name, seg, seg == "size")
 			}
 			if eval {
 				v = segment(v, val{s: seg, lit: litStr}, at, ruby, falsyRoot, depth)
@@ -454,6 +461,9 @@ func (r *renderer) path(eval, lenient bool) any {
 			if r.peek() != ']' {
 				bail(r.pos(), "expected-bracket", "expected ]")
 			}
+			if depth == 0 {
+				r.read(name, k.s, k.lit != litStr || k.s == "size")
+			}
 			if eval {
 				v = segment(v, k, at, ruby, falsyRoot, depth)
 			}
@@ -463,6 +473,9 @@ func (r *renderer) path(eval, lenient bool) any {
 			}
 			r.p++
 		default:
+			if depth == 0 {
+				r.read(name, "", true)
+			}
 			if r.undef.set && r.undef.pos == r.base+start {
 				r.undef.path = r.src[start:r.p] // name the whole path, not just the undefined prefix
 			}
@@ -482,6 +495,25 @@ func segment(v any, k val, at int, ruby, falsyRoot bool, depth int) any {
 		return Undefined{}
 	}
 	return key(v, k, at)
+}
+
+// read records, for Engine.Reads, that the template reads key of the variable name, or
+// with whole, all of it. A nil key list means the whole variable.
+func (r *renderer) read(name, key string, whole bool) {
+	if r.reads != nil {
+		r.record(name, key, whole)
+	}
+}
+
+func (r *renderer) record(name, key string, whole bool) {
+	keys, seen := r.reads[name]
+	switch {
+	case name == "forloop", seen && keys == nil:
+	case whole:
+		r.reads[name] = nil
+	case !slices.Contains(keys, key):
+		r.reads[name] = append(keys, key)
+	}
 }
 
 func (r *renderer) root(name string, at int) any {
