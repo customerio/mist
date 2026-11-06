@@ -1,3 +1,10 @@
+cases.json base64_decode
+cases.json base64_decode drops a lone trailing character
+cases.json base64_decode of the URL-safe alphabet
+cases.json base64_decode reads a UTF-16 unit's low byte
+cases.json base64_decode reads a surrogate's low byte
+cases.json base64_decode stops at a unit whose low byte is '='
+cases.json cycle shares a position by count
 cases.json date %N is milliseconds right-padded
 cases.json date %s shifts with a timezone
 cases.json liquidjs_filters.go lists 87 filters; liquidjs defines 88
@@ -6,8 +13,10 @@ cases.json memory
 cases.json numeric property names
 cases.json round
 cases.json slice truncates a fractional end toward zero
+cases.json truncate keeps characters outside the BMP whole
 cases.json truncatewords
 cases.json url_decode
+corpus.json generated "gen-1-149" strict=false
 corpus.json generated "gen-1-3183" strict=false
 corpus.json generated "gen-1-3183" strict=true
 corpus.json generated "gen-1-4172" strict=false
@@ -16,6 +25,12 @@ corpus.json generated "gen-1-4346" strict=false
 corpus.json generated "gen-1-4346" strict=true
 corpus.json generated "gen-1-4369" strict=false
 corpus.json generated "gen-1-4369" strict=true
+corpus.json golden-liquid "filters, base64 decode, not a string" strict=false
+corpus.json golden-liquid "filters, base64 decode, not a string" strict=true
+corpus.json golden-liquid "filters, slice, first argument is a float" strict=false
+corpus.json golden-liquid "filters, slice, first argument is a float" strict=true
+corpus.json golden-liquid "filters, slice, second argument is a float" strict=false
+corpus.json golden-liquid "filters, slice, second argument is a float" strict=true
 corpus.json golden-liquid "filters, squish, any whitespace before between and after" strict=false
 corpus.json golden-liquid "filters, squish, any whitespace before between and after" strict=true
 corpus.json golden-liquid "filters, squish, just space after" strict=false
@@ -36,11 +51,16 @@ corpus.json golden-liquid "filters, squish, space before between and after" stri
 corpus.json golden-liquid "filters, squish, space before between and after" strict=true
 corpus.json golden-liquid "filters, truncatewords, all whitespace is clobbered" strict=false
 corpus.json golden-liquid "filters, truncatewords, all whitespace is clobbered" strict=true
+corpus.json golden-liquid "tags, cycle, named with different items" strict=false
+corpus.json golden-liquid "tags, cycle, named with different items" strict=true
+corpus.json golden-liquid "tags, cycle, undefined variable names mixed with no name" strict=false
 corpus.json liquid-spec/basics/filter-edge-cases.yml "slice_with_negative_length" strict=false
 corpus.json liquid-spec/basics/filter-edge-cases.yml "slice_with_negative_length" strict=true
 corpus.json liquid-spec/liquid_ruby/manual.yml "Truncatewords replaces UTF-8 ASCII whitespaces to a space character" strict=false
 corpus.json liquid-spec/liquid_ruby/manual.yml "Truncatewords replaces UTF-8 ASCII whitespaces to a space character" strict=true
 corpus.json liquid-spec/liquid_ruby/standard_filters.yml "StandardFilterTest#test_url_decode_db5f2730" strict=false
 corpus.json liquid-spec/liquid_ruby/standard_filters.yml "StandardFilterTest#test_url_decode_db5f2730" strict=true
+corpus.json liquid-spec/shopify_production_recordings/recorded_specs.yml "RecordedTest#test_truncate_empty_negative_516a59098" strict=false
+corpus.json liquid-spec/shopify_production_recordings/recorded_specs.yml "RecordedTest#test_truncate_empty_negative_516a59098" strict=true
 corpus.json liquid-spec/shopify_production_recordings/recorded_specs.yml "RecordedTest#test_truncatewords_with_newlines_c34fe3398" strict=false
 corpus.json liquid-spec/shopify_production_recordings/recorded_specs.yml "RecordedTest#test_truncatewords_with_newlines_c34fe3398" strict=true
