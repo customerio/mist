@@ -61,8 +61,10 @@ type renderer struct {
 	shared
 	tpl          string
 	out          []byte
-	check        bool         // parse every branch, evaluate nothing
-	undef        pendingUndef // strict undefined, raised once the current tag parses cleanly
+	check        bool                // parse every branch, evaluate nothing
+	reads        map[string][]string // Engine.Reads's result, recorded while check is set
+	readsAll     bool                // a custom tag can read any variable
+	undef        pendingUndef        // strict undefined, raised once the current tag parses cleanly
 	stack        [inlineDepth]frame
 	deep         []frame // frames from inlineDepth on
 	tagFrames    []frame // the open frames, reused for each custom tag call
@@ -577,6 +579,7 @@ func (r *renderer) tag(b, e, next int, lt, rt bool) (int, bool) {
 		if v == "" {
 			bail(b, "counter-syntax", "expected: %s <ident>", name)
 		}
+		r.read(v, "", true)
 		if live {
 			r.counter(v, name == "increment")
 		}
@@ -587,6 +590,7 @@ func (r *renderer) tag(b, e, next int, lt, rt bool) (int, bool) {
 		if !ok {
 			bail(b, "tag:"+name, "unsupported tag %q", name)
 		}
+		r.readsAll = true
 		if live {
 			r.ws()
 			src := r.tpl[b:e] // a {% liquid %} line has no delimiters

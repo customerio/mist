@@ -1,6 +1,6 @@
-# mist Liquid subset — v0.40.x
+# mist Liquid subset — v0.41.x
 
-_Last updated 2026-11-05. Parity target: liquidjs 10.26.0 configured with `new Liquid({ lenientIf: true })`, running with `TZ=UTC` and the en-US locale._
+_Last updated 2026-11-06. Parity target: liquidjs 10.26.0 configured with `new Liquid({ lenientIf: true })`, running with `TZ=UTC` and the en-US locale._
 
 **Contract.** For every template and data where mist returns output, liquidjs returns the same output. Where mist returns `ErrUndefined`, liquidjs fails too, and where its `Path` is set, with exactly the message `Path`, `Line` and `Col` give (see Strict undefined error). Anything else returns `ErrUnsupported`, and the caller renders with the full engine. Bailing is always safe, so when in doubt, the spec bails. Every error is an `*Error` whose `Code` names the reason and stays the same across releases (`testdata/codes.txt` lists them), so callers can count bails by reason without parsing `Msg`. A panic in mist or in a registered tag, filter or dialect hook is recovered as `ErrInternal`, which wraps `ErrUnsupported` so the caller falls back; it means a bug, and `Error.Stack` says where.
 
@@ -214,6 +214,17 @@ liquidjs's `renderLimit` (a time budget) has no counterpart. mist renders far fa
 - Post-processing such as CSS inlining is the caller's job. A step whose output must be post-processed before later steps read it belongs with the full engine.
 - The caller's maps are never mutated.
 
+## Reads
+
+`Engine.Reads` reports what a template can read from its vars, so a caller can load only that (such as single snippets or customer attributes) before rendering. It runs `Check` and records every variable path, including those in dead branches and `*_exp` expressions:
+- Each variable maps to the first keys read under it: `customer.address.city` and `customer["address"]` read `address`.
+- The list is nil, meaning the whole value, where the variable is used other than through a literal first key: on its own (output, assign, loop collection, filter input, comparison), with a computed first index (`customer[customer.attr]`), through `size`, as a range bound, or as an `increment` or `decrement` counter.
+- Names are over-reported, never under-reported: assigns, loop variables and `*_exp` items are listed too.
+- `all` is true when the template uses a custom tag, which can read anything through `Tag.Vars`, `Tag.Lookup` and `Tag.Render`.
+- An error is `Check`'s. Load everything.
+
+Following values that are themselves rendered as templates (snippets rendered by a chain) is the caller's job: call `Reads` on each loaded body until no new names appear.
+
 ## Verification
 
 | Layer | What it proves |
@@ -225,6 +236,7 @@ liquidjs's `renderLimit` (a time budget) has no counterpart. mist renders far fa
 | `testdata/jsdate.json` | liquidjs's `date` for every strftime directive, with flags and widths, across 59 instants (each hour that matters to `%p` and `%I`, each weekday, January 1 on each weekday, leap days, years 1000 and 9999), and for edge-case input strings (hour 24, second 60, February 30, ±24:00 offsets, two-digit years) (`node scripts/jsdate.mjs`). `TestDateTable` requires each to match or bail, and instants within years 1000–9999 to bail only on `%c`, `%x`, `%X` and `%Z`. |
 | `testdata/jschar.json` | For every code point, JavaScript's `\s`, what liquidjs's `{{-` trims (found by rendering it), what `number_of_words: 'cjk'` counts as a word of its own, and what `slugify` keeps in the `default`, `pretty` and `raw` modes; and liquidjs's output for each whitespace character in whitespace control, `{% # %}` and `{% liquid %}` lines, `strip`, `normalize_whitespace`, `number_of_words`, `truncatewords`, `slugify`, `to_integer` and `blank` (`node scripts/jschar.mjs`). `TestCharClasses` requires `jsSpace`, `isTrimBlank`, `isCJK` and `slugify` to match or bail for each code point, and each whitespace render to match exactly. |
 | `FuzzRender` | No panics. `Check` rejects ⇒ `Render` fails, and `Check` accepts ⇒ `Render` never bails on syntax. |
+| `TestReadsSound` | Every case and corpus template (or `MIST_CORPUS`'s) renders the same, lax and strict, with its data pruned to what `Reads` reports. |
 | `FuzzInvariants` | On fuzzed templates and JSON data: `Render` is deterministic, `Append` gives the prefix plus `Render`'s output, a one-step `RenderChain` gives `Render`'s result, raising `Limits` or setting `PassUnknownFilters` never changes what renders, and the caller's vars are never mutated. |
 | `FuzzParity` | Opt-in (`MIST_FUZZ_PARITY=1`, needs Node): on fuzzed templates and JSON data, wherever mist renders, liquidjs (`scripts/parity-worker.mjs`) gives the same output, and wherever mist returns `ErrUndefined`, liquidjs fails. |
 
