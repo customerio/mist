@@ -1,8 +1,8 @@
 # mist
 
-[![CI](https://github.com/hownowstephen/mist/actions/workflows/ci.yml/badge.svg)](https://github.com/hownowstephen/mist/actions/workflows/ci.yml)
-[![Go Reference](https://pkg.go.dev/badge/github.com/hownowstephen/mist.svg)](https://pkg.go.dev/github.com/hownowstephen/mist)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/hownowstephen/mist/badge)](https://scorecard.dev/viewer/?uri=github.com/hownowstephen/mist)
+[![CI](https://github.com/customerio/mist/actions/workflows/ci.yml/badge.svg)](https://github.com/customerio/mist/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/customerio/mist.svg)](https://pkg.go.dev/github.com/customerio/mist)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/customerio/mist/badge)](https://scorecard.dev/viewer/?uri=github.com/customerio/mist)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15202/badge)](https://www.bestpractices.dev/projects/15202)
 
 A single-pass Go renderer for most of [Liquid](https://shopify.github.io/liquid/), fast enough to try before falling back to a full engine.
@@ -14,7 +14,7 @@ Use it in front of liquidjs (or an engine that behaves like it) when you render 
 ## Install
 
 ```bash
-go get github.com/hownowstephen/mist
+go get github.com/customerio/mist
 ```
 
 Requires Go 1.25 or newer.
@@ -36,7 +36,7 @@ case errors.Is(err, mist.ErrUndefined):
 ## Will my templates render?
 
 ```bash
-go run github.com/hownowstephen/mist/cmd/mistcheck@latest template.liquid
+go run github.com/customerio/mist/cmd/mistcheck@latest template.liquid
 ```
 
 It reports the first construct each template uses that mist doesn't render; `-stats` summarizes a whole set. See [docs/mistcheck.md](docs/mistcheck.md).
@@ -49,11 +49,11 @@ It reports the first construct each template uses that mist doesn't render; `-st
 | [docs/extending.md](docs/extending.md) | `Engine`: custom tags and filters, chains of templates, dialects for other Liquid engines |
 | [docs/mistcheck.md](docs/mistcheck.md) | The template checker |
 | [SPEC.md](SPEC.md) | The normative grammar and semantics, and how parity is verified |
-| [pkg.go.dev](https://pkg.go.dev/github.com/hownowstephen/mist) | API reference with runnable examples |
+| [pkg.go.dev](https://pkg.go.dev/github.com/customerio/mist) | API reference with runnable examples |
 | [CONTRIBUTING.md](CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) | Working on mist, for people and coding agents |
 | [SECURITY.md](SECURITY.md) | Reporting vulnerabilities, verifying releases |
 
-Releases and their notes are on the [releases page](https://github.com/hownowstephen/mist/releases). Report bugs, including any output that differs from liquidjs, in [issues](https://github.com/hownowstephen/mist/issues).
+Releases and their notes are on the [releases page](https://github.com/customerio/mist/releases). Report bugs, including any output that differs from liquidjs, in [issues](https://github.com/customerio/mist/issues).
 
 ## License
 

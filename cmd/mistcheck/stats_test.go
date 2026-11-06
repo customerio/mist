@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hownowstephen/mist"
+	"github.com/customerio/mist"
 )
 
 func TestBlockers(t *testing.T) {
