@@ -97,7 +97,10 @@ func TestCorpus(t *testing.T) {
 			case errors.Is(err, ErrUndefined) && want.Err != "":
 				if errors.As(err, &e) && e.Path != nil {
 					undefChecked++
-					if msg := fmt.Sprintf("undefined variable: %s, line:%d, col:%d", strings.Join(e.Path, "."), e.Line, e.Col); msg != want.Err {
+					msg := fmt.Sprintf("undefined variable: %s, line:%d, col:%d", strings.Join(e.Path, "."), e.Line, e.Col)
+					// oracle.mjs keeps the first line, cut to 200 UTF-16 units
+					first, _, _ := strings.Cut(msg, "\n")
+					if first != want.Err && !(strings.HasPrefix(first, want.Err) && len16(want.Err) == 200) {
 						t.Errorf("%s %q: mist's undefined error words as %q, liquidjs's as %q\n  tpl:  %q", c.Src, c.Name, msg, want.Err, c.Tpl)
 					}
 				}
