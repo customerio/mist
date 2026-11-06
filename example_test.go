@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hownowstephen/mist"
+	"github.com/customerio/mist"
 )
 
 func ExampleRender() {

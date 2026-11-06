@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/hownowstephen/mist"
+	"github.com/customerio/mist"
 )
 
 var filterName = regexp.MustCompile(`^\s*([\w-]+)`)

@@ -438,11 +438,12 @@ func (r *renderer) matching(v val, a []val, at int, first, keep bool) (out []any
 
 // itemPath reads a dotted path off item as liquidjs's evalToken on a scope spawned from it does.
 func (r *renderer) itemPath(item any, path string, at int) any {
-	if _, isMap := item.(map[string]any); !isMap && item != nil {
-		if first, _, _ := strings.Cut(path, "."); magic(first) {
-			// liquidjs scopes the lookup to the item, where a string's or array's size, first
-			// and last aren't computed.
+	if first, _, _ := strings.Cut(path, "."); magic(first) {
+		// liquidjs reads a key the item lacks from its globals, whose size is 0.
+		if m, ok := item.(map[string]any); !ok {
 			bail(at, "where-computed-key", "where by %s on an item that isn't an object", first)
+		} else if _, own := m[first]; !own {
+			bail(at, "where-computed-key", "where by %s on an item without that key", first)
 		}
 	}
 	x := item

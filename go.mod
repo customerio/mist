@@ -1,3 +1,3 @@
-module github.com/hownowstephen/mist
+module github.com/customerio/mist
 
 go 1.25.0

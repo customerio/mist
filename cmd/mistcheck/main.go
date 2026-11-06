@@ -18,7 +18,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/hownowstephen/mist"
+	"github.com/customerio/mist"
 )
 
 type template struct {
