@@ -176,5 +176,5 @@ jobs:
           if [ -n "$n" ]; then
             gh issue comment "$n" -R "$GITHUB_REPOSITORY" --body "Failed again: $RUN_URL"
           else
-            gh issue create -R "$GITHUB_REPOSITORY" --label nightly --title "Nightly failed" --body "$RUN_URL"
+            gh issue create -R "$GITHUB_REPOSITORY" --label nightly --assignee hownowstephen --title "Nightly failed" --body "$RUN_URL"
           fi
