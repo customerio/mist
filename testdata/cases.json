@@ -611,6 +611,8 @@
   {"name": "radix string with upper-case digits", "spec": ["r-math"], "tpl": "{{ '0XaB' | plus: 0 }}", "out": "171"},
   {"name": "radix string with a control character is NaN", "spec": ["r-math"], "tpl": "{{ '0X\u00101' | plus: 0 }}", "out": "0"},
   {"name": "bracket path then colon is a keyword argument name", "spec": ["r-out-of-spec"], "tpl": "{{ 0 | append: x[y]: }}", "strict": true, "err": "unsupported", "code": "named-filter-arguments"},
+  {"name": "string literal then colon is a keyword argument name", "spec": ["r-out-of-spec"], "tpl": "{{ xs | where_exp: 'a', 'a0': }}", "data": {"xs": [1]}, "strict": true, "err": "unsupported", "code": "named-filter-arguments"},
+  {"name": "dotted path then colon is a keyword argument name", "spec": ["r-out-of-spec"], "tpl": "{{ s | append: a.b: }}", "data": {"s": "x"}, "strict": true, "err": "unsupported", "code": "named-filter-arguments"},
   {"name": "base64_decode reads a UTF-16 unit's low byte", "spec": ["r-string-filters"], "tpl": "{{ 'A0ķ' | base64_decode }}", "out": "\u0003N"},
   {"name": "base64_decode reads a surrogate's low byte", "spec": ["r-string-filters"], "tpl": "{{ t | base64_decode }}", "data": {"t": "A0񾼷"}, "out": "\u0003N"},
   {"name": "base64_decode stops at a unit whose low byte is '='", "spec": ["r-string-filters"], "tpl": "{{ t | base64_decode }}", "data": {"t": "aGkhĽaGk"}, "out": "hi!"},

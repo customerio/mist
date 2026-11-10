@@ -97,6 +97,10 @@ func (r *renderer) filters(v val, eval bool) val {
 					bail(at, "keyword-outside-equality", "%s is only supported in conditions and output", k)
 				}
 				args = append(args, arg)
+				r.ws()
+				if r.peek() == ':' {
+					bail(at, "named-filter-arguments", "named filter arguments other than default's allow_false: true/false are not supported")
+				}
 			}
 			r.ws()
 		}
