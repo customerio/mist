@@ -252,6 +252,18 @@ func (e Engine) Check(tpl string) (err error) {
 	return nil
 }
 
+// Reads reports which variables tpl can read, for loading only those: keys maps each
+// variable name to the keys of it the template reads, or to nil when it can read the
+// whole value (a computed key, size, or the value itself, as in a loop or filter input).
+// Names are over-reported (assigns and loop variables shadowing nothing are listed too).
+// all is true when tpl uses a custom tag, which can read anything. err is Check's.
+func (e Engine) Reads(tpl string) (keys map[string][]string, all bool, err error) {
+	r := renderer{config: e.config(nil, false), tpl: tpl, check: true, reads: map[string][]string{}}
+	defer r.recoverBail(&err)
+	r.run()
+	return r.reads, r.readsAll, nil
+}
+
 func (e Engine) config(vars map[string]any, strict bool) config {
 	return config{vars: vars, strict: strict, tags: e.Tags, filterFns: e.Filters, passUnknown: e.PassUnknownFilters, dialect: e.Dialect, now: e.Now, limits: e.Limits.orDefaults()}
 }
