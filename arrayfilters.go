@@ -447,6 +447,11 @@ func (r *renderer) itemPath(item any, path string, at int) any {
 		}
 	}
 	x := item
+	if isNil(val{x: item}) {
+		// liquidjs spawns the item's scope from Object(item), which for null and undefined
+		// is an empty object, so the path reads as undefined rather than null.
+		x = Undefined{}
+	}
 	for key := range strings.SplitSeq(path, ".") {
 		if r.strict && isNil(val{x: x}) {
 			bail(at, "where-strict-missing", "where on an item missing %q under strict", path) // liquidjs throws
