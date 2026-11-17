@@ -75,6 +75,7 @@ type renderer struct {
 	binds        []binding // expression filter items, innermost last
 	exps         int       // *_exp expressions being evaluated
 	lenientUndef bool      // a lenient path met an undefined variable under strict
+	afterUndef   bool      // the next path follows an operand that met an undefined variable
 	floor        int       // frames a Tag.Render inherited, which its tags can't close or break out of
 	nested       int       // Tag.Render depth
 	scope        *tagScope // what custom tags see, allocated on the first call so the renderer stays on the stack
