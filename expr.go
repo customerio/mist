@@ -113,6 +113,9 @@ func (r *renderer) ident() string {
 // fcond = value { filter }
 // Returns false when not evaluating. Undefined variables are lenient (lenientIf).
 func (r *renderer) fcond(eval bool) bool {
+	if r.rubyLax() {
+		return r.rubyCond(eval)
+	}
 	v, _, _ := r.value(eval, true, true)
 	at := r.pos()
 	if r.peek() == '|' {
@@ -157,6 +160,9 @@ func precedence(op string) int {
 // Anything outside cond (in a condition) or a lone operand (elsewhere) bails when the
 // dialect rejects LooseExpressions.
 func (r *renderer) value(eval, lenient, inCond bool) (v val, lone bool, end int) {
+	if !inCond && r.rubyLax() {
+		return r.rubyValue(eval, lenient)
+	}
 	start := r.pos()
 	r.ws()
 	if p := r.p; r.op() != "" || !r.valueStart() {
@@ -241,6 +247,159 @@ func (r *renderer) operands(eval, lenient, inCond bool, start, end int, first *o
 		bail(start, "dialect-loose-expression", "an expression outside the dialect's grammar")
 	}
 	return vals[0].v, lone, end
+}
+
+func (r *renderer) rubyLax() bool { return r.dialect != nil && r.dialect.RubyLax }
+
+// rubyCond is a condition as Ruby's If reads it: segments `operand [op [operand]]`
+// joined by and/or, grouped right to left; text after a segment's operands is ignored.
+func (r *renderer) rubyCond(eval bool) bool {
+	var rb [8]bool
+	var ob [8]bool // true for and
+	res, ands := rb[:0], ob[:0]
+	for {
+		r.ws()
+		if r.andOr() != "" || r.p == len(r.src) {
+			bail(r.pos(), "dialect-ruby-and-or", "and/or where Ruby expects an operand")
+		}
+		a := r.rubyOperand(eval, true)
+		r.ws()
+		op, at := r.rubyOp(), r.pos()
+		seg := false
+		if op == "" {
+			seg = eval && truthy(a.v, at)
+		} else {
+			r.ws()
+			b := operand{val{x: nil}, at}
+			if c := r.peek(); r.p < len(r.src) && c != ',' && c != '|' && r.andOr() == "" {
+				b = r.rubyOperand(eval, true)
+			}
+			seg = r.cmp(op, a, b, at, eval)
+		}
+		res = append(res, seg)
+		r.rubyJunk()
+		w := r.andOr()
+		if w == "" {
+			break // the end
+		}
+		r.p += len(w)
+		ands = append(ands, w == "and")
+	}
+	v := res[len(res)-1]
+	for i := len(ands) - 1; i >= 0; i-- {
+		if ands[i] {
+			v = res[i] && v
+		} else {
+			v = res[i] || v
+		}
+	}
+	return eval && v
+}
+
+// rubyValue is an output's or assign's value as Ruby's Variable reads it: the first
+// operand, then filters from the first |.
+func (r *renderer) rubyValue(eval, lenient bool) (val, bool, int) {
+	r.ws()
+	v := r.rubyOperand(eval, lenient)
+	end := r.p
+	for ; r.p < len(r.src) && r.src[r.p] != '|'; r.p++ {
+		if c := r.src[r.p]; c == '"' || c == '\'' {
+			bail(r.pos(), "dialect-ruby-skipped-quote", "a quote in text Ruby skips, where it finds | inside strings too")
+		}
+	}
+	return v.v, true, end
+}
+
+// rubyOperand is an operand that is exactly one Ruby QuotedFragment: it ends at a
+// blank, ',', '|' or the end, and holds no blank.
+func (r *renderer) rubyOperand(eval, lenient bool) operand {
+	at := r.pos()
+	if !r.valueStart() {
+		bail(at, "dialect-ruby-fragment", "an operand Ruby reads differently")
+	}
+	start := r.p
+	v := r.expr(eval, lenient)
+	if c := r.peek(); r.p < len(r.src) && !isBlank(c) && c != ',' && c != '|' || unquotedBlank(r.src[start:r.p]) {
+		bail(at, "dialect-ruby-fragment", "an operand Ruby reads differently")
+	}
+	return operand{v, at}
+}
+
+// unquotedBlank reports a blank in s outside quotes, where a Ruby QuotedFragment ends.
+func unquotedBlank(s string) bool {
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; {
+		case c == '"' || c == '\'':
+			if k := strings.IndexByte(s[i+1:], c); k >= 0 {
+				i += k + 1
+			}
+		case isBlank(c), c == 0xC2 && i+1 < len(s) && s[i+1] == 0xA0:
+			return true
+		}
+	}
+	return false
+}
+
+// rubyOp reads Ruby's operator run, [=!<>a-z_]+, as the operator mist compares
+// with, or "" for none. An and/or word is no operator, and an unknown one bails.
+func (r *renderer) rubyOp() string {
+	if r.andOr() != "" {
+		return ""
+	}
+	j := r.p
+	for j < len(r.src) {
+		if c := r.src[j]; c == '=' || c == '!' || c == '<' || c == '>' || c == '_' || c >= 'a' && c <= 'z' {
+			j++
+		} else {
+			break
+		}
+	}
+	op := r.src[r.p:j]
+	switch op {
+	case "":
+		return ""
+	case "<>":
+		op = "!="
+	case "==", "!=", "<", ">", "<=", ">=", "contains":
+	default:
+		bail(r.pos(), "dialect-ruby-operator", "unknown operator %q, which Ruby raises on", op)
+	}
+	r.p = j
+	return op
+}
+
+// andOr is the and/or at r.p that Ruby splits a condition on, or "". One glued to
+// anything but a word character or blank bails.
+func (r *renderer) andOr() string {
+	rest := r.src[r.p:]
+	for _, w := range [...]string{"and", "or"} {
+		if !strings.HasPrefix(rest, w) {
+			continue
+		}
+		if len(rest) == len(w) || isBlank(rest[len(w)]) {
+			return w
+		}
+		if c := rest[len(w)]; c == '_' || c >= '0' && c <= '9' || c|0x20 >= 'a' && c|0x20 <= 'z' {
+			return "" // a longer word
+		}
+		bail(r.pos(), "dialect-ruby-and-or", "%s glued to %q, which Ruby splits on", w, rest[len(w)])
+	}
+	return ""
+}
+
+// rubyJunk skips the tokens after a segment, up to an and/or or the end.
+func (r *renderer) rubyJunk() {
+	for {
+		r.ws()
+		if r.p == len(r.src) || r.andOr() != "" {
+			return
+		}
+		for ; r.p < len(r.src) && !isBlank(r.src[r.p]); r.p++ {
+			if c := r.src[r.p]; c == '"' || c == '\'' {
+				bail(r.pos(), "dialect-ruby-skipped-quote", "a quote in text Ruby skips")
+			}
+		}
+	}
 }
 
 // strictLoose bails where a strict undefined met an operator ahead of filters: a leading

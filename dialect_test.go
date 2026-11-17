@@ -341,3 +341,55 @@ func TestDialectContains(t *testing.T) {
 		t.Errorf("keyword: got %v; want keyword-outside-equality", err)
 	}
 }
+
+// Outputs are render's legacy (Ruby Liquid 2.5 emulation) engine's.
+func TestDialectRubyLax(t *testing.T) {
+	e := Engine{Dialect: &Dialect{RubyLax: true}}
+	data := map[string]any{"a": 1, "b": 0, "f": false, "t": true, "n": nil, "s": "x"}
+	cond := func(c string) string { return "{% if " + c + " %}Y{% else %}N{% endif %}" }
+	for tpl, want := range map[string]string{
+		cond("a == 1 t"):          "Y",
+		cond("a == 2 t"):          "N",
+		cond("a == 1, t"):         "Y",
+		cond("a == 1 T or f"):     "Y",
+		cond("f | default: true"): "N",
+		cond("b | plus: 1 > 5"):   "Y",
+		cond("a =="):              "N",
+		cond("n =="):              "Y",
+		cond("n == and t"):        "Y",
+		cond("a 1"):               "Y",
+		cond("t and f or t"):      "Y",
+		cond("f or t and f"):      "N",
+		cond("a <> 1"):            "N",
+		cond("a == 1 and_x"):      "Y",
+		"{% unless a == 1 t %}Y{% endunless %}{% if f %}{% elsif t 1 %}E{% endif %}": "E",
+		"{{ a b }}|{{ a, b }}|{{ a == 1 }}|{{ s junk | upcase }}":                    "1|1|1|X",
+		"{% assign x = a b %}{{ x }}{% assign y = s | upcase %}{{ y }}":              "1X",
+	} {
+		if out, err := e.Render(tpl, data, false); err != nil || out != want {
+			t.Errorf("%s: got %q, %v; want %q", tpl, out, err, want)
+		}
+	}
+	for tpl, code := range map[string]string{
+		cond("a b"):                           "dialect-ruby-operator",
+		cond("a = 1"):                         "dialect-ruby-operator",
+		cond("not a"):                         "reserved-word-variable",
+		cond("a==1"):                          "dialect-ruby-fragment",
+		cond(`a == "x"y`):                     "dialect-ruby-fragment",
+		cond(`a == 1 "x"`):                    "dialect-ruby-skipped-quote",
+		cond("and a"):                         "dialect-ruby-and-or",
+		cond("a and"):                         "dialect-ruby-and-or",
+		cond("a or, b"):                       "dialect-ruby-and-or",
+		`{{ s "q" | upcase }}`:                "dialect-ruby-skipped-quote",
+		"{% if false %}{{ a==1 }}{% endif %}": "dialect-ruby-fragment",
+	} {
+		_, err := e.Render(tpl, data, false)
+		var me *Error
+		if !errors.As(err, &me) || me.Code != code {
+			t.Errorf("%s: got %v; want %s", tpl, err, code)
+		}
+		if err := e.Check(tpl); !errors.Is(err, ErrUnsupported) {
+			t.Errorf("%s: Check got %v; want ErrUnsupported", tpl, err)
+		}
+	}
+}
