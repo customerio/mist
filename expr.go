@@ -198,8 +198,8 @@ func (r *renderer) operands(eval, lenient, inCond bool, start, end int, first *o
 			ops = append(ops, operator{op, r.pos()})
 			strict = strict && op != "not"
 			lone = false
-			switch {
-			case op == "and" || op == "or":
+			switch op {
+			case "and", "or":
 				strict = strict && (state == 1 || state == 3)
 				state = 0
 			default:
