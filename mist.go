@@ -78,6 +78,10 @@ type Engine struct {
 	PassUnknownFilters bool
 	// Limits bound each render; zero fields take the defaults.
 	Limits Limits
+	// PathCheck, if set, decides in place of Check whether a strict ErrUndefined keeps its
+	// Path: it returns nil where the full engine parses tpl. Set it for a full engine that
+	// parses more than Check accepts.
+	PathCheck func(tpl string) error
 }
 
 // Limits bound one render. Going over one bails with ErrUnsupported, so the full engine,
@@ -226,11 +230,18 @@ func (e Engine) append(dst []byte, tpl string, vars map[string]any, strict bool)
 	return out, env, err
 }
 
-// dropUnsurePath clears an ErrUndefined's Path when tpl doesn't pass Check: liquidjs parses
-// the whole template first, and may report a later error instead.
+// dropUnsurePath clears an ErrUndefined's Path when tpl doesn't pass Check, or PathCheck:
+// liquidjs parses the whole template first, and may report a later error instead.
 func dropUnsurePath(e Engine, tpl string, err error) {
 	var me *Error
-	if errors.As(err, &me) && me.Path != nil && e.Check(tpl) != nil {
+	if !errors.As(err, &me) || me.Path == nil {
+		return
+	}
+	check := e.Check
+	if e.PathCheck != nil {
+		check = e.PathCheck
+	}
+	if check(tpl) != nil {
 		me.Path = nil
 	}
 }
