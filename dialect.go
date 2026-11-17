@@ -46,6 +46,14 @@ type Dialect struct {
 	// first segment is nil or false the whole lookup is that value, and past it a
 	// property or index of nil or false is undefined (ErrUndefined under strict).
 	RubyLookups bool
+
+	// RubyLax reads conditions, outputs and assigns as Ruby Liquid 2.5's lax parser
+	// does. A condition is and/or-joined segments of `operand [op [operand]]`: a
+	// missing right operand is nil, and anything after a segment, filters included,
+	// is ignored. An output's or assign's value is its first operand, then its
+	// filters from the first `|`. An operator Ruby doesn't know (Ruby's "Unknown
+	// operator" error), and anything mist can't split exactly as Ruby does, bails.
+	RubyLax bool
 }
 
 // Constructs is a set of template constructs a Dialect can reject.

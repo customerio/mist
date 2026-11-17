@@ -30,6 +30,10 @@ dialect-loose-expression
 dialect-negative-literal
 dialect-raw
 dialect-raw-filter
+dialect-ruby-and-or
+dialect-ruby-fragment
+dialect-ruby-operator
+dialect-ruby-skipped-quote
 dialect-trim-markers
 dialect-unspaced-operator
 expected-bracket
