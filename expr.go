@@ -211,7 +211,9 @@ func (r *renderer) operands(eval, lenient, inCond bool, start, end int, first *o
 			break
 		}
 		at := r.pos()
+		r.afterUndef = n > 0 && (r.undef.set || r.exps > 0 && r.lenientUndef)
 		x := r.expr(eval, lenient)
+		r.afterUndef = false
 		if n == 0 {
 			end = r.p
 		}
@@ -535,6 +537,8 @@ func (r *renderer) blankAt(i int) bool {
 // path = ident { "." ws word | "[" ws expr ws "]" }
 func (r *renderer) path(eval, lenient bool) any {
 	start := r.p
+	earlier := r.afterUndef // an earlier operand's undefined
+	r.afterUndef = false
 	name := r.ident()
 	var kb [8]val // the keys so far, for ErrUndefined's Path
 	keys := kb[:0]
@@ -604,6 +608,9 @@ func (r *renderer) path(eval, lenient bool) any {
 				bail(at, "keyword-index", "%s as an index", k.keyword())
 			}
 			if eval && r.strict && isUndef(k) {
+				if earlier {
+					bail(at, "strict-loose-default", "an undefined index after an earlier undefined operand, under strict") // which liquidjs throws depends on a leading default
+				}
 				// liquidjs evaluates index keys strictly, even where the path itself is lenient.
 				e := &Error{Kind: ErrUndefined, Code: "undefined", Pos: at, Msg: r.src[at-r.base : r.p]}
 				if r.undef.set && r.undef.pos == at {
