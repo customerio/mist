@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -193,6 +194,19 @@ func TestUndefinedPath(t *testing.T) {
 	var e *Error
 	if !errors.As(err, &e) || !errors.Is(err, ErrUndefined) || e.Path != nil {
 		t.Errorf("got %v with Path %v; want ErrUndefined without a Path", err, e.Path)
+	}
+	// A full engine that parses the later tag says so with PathCheck.
+	for _, c := range []struct {
+		check func(string) error
+		path  []string
+	}{
+		{func(string) error { return nil }, []string{"c", "z"}},
+		{func(string) error { return ErrUnsupported }, nil},
+	} {
+		_, err := Engine{PathCheck: c.check}.Render("{{ c.z }} {% if %}{% endif %}", data, true)
+		if !errors.As(err, &e) || !errors.Is(err, ErrUndefined) || !slices.Equal(e.Path, c.path) {
+			t.Errorf("got %v with Path %v; want ErrUndefined with Path %v", err, e.Path, c.path)
+		}
 	}
 }
 
