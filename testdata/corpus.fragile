@@ -133,10 +133,13 @@ liquid-spec/liquid_ruby/blank_body_error_handling.yml
 liquid-spec/liquid_ruby/case_when_matching.yml
 	case_body_state_advances_per_matching_render
 	case_repeats_body_for_each_matching_when_value
+liquid-spec/liquid_ruby/comparison_semantics.yml
+	comparison_with_non_ordered_type_is_false
 liquid-spec/liquid_ruby/liquid_tag.yml
 	RecordedTest#LiquidTagParityTest#test_decrement_in_liquid_6e75fc9f
 	RecordedTest#LiquidTagParityTest#test_increment_in_liquid_a7c65aba
 liquid-spec/liquid_ruby/manual.yml
+	Comparing undefined variables in if statement	strict
 	Float serialization with very long float
 	Float serialization with zero in decimal place
 	Lookup first on hash	lax
@@ -244,6 +247,8 @@ liquid-spec/shopify_production_recordings/recorded_specs.yml
 	RecordedTest#test_big_integers_fce4e7b8b
 	RecordedTest#test_can_use_range_in_filter_580ea5229
 	RecordedTest#test_data_escaping_9e876fe0d
+	RecordedTest#test_errors_when_comparing_uncomparable_types_346e9510a
+	RecordedTest#test_errors_when_comparing_uncomparable_types_5a083d2ee
 	RecordedTest#test_escape_returns_falsey_value_when_fed_nil_00e2bf672
 	RecordedTest#test_first_95f89b01e	lax
 	RecordedTest#test_float_format_negative_exponent_break_9d74f1ee4
