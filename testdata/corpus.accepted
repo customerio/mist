@@ -9,6 +9,7 @@ generated
 	gen-1-1008
 	gen-1-1009	strict
 	gen-1-1011
+	gen-1-1012	strict
 	gen-1-1016
 	gen-1-1018
 	gen-1-102
@@ -20,6 +21,7 @@ generated
 	gen-1-1031
 	gen-1-1032
 	gen-1-1034
+	gen-1-1035	strict
 	gen-1-1036
 	gen-1-1037
 	gen-1-1039
@@ -33,6 +35,7 @@ generated
 	gen-1-1055	strict
 	gen-1-1057
 	gen-1-1058	strict
+	gen-1-1059
 	gen-1-1060
 	gen-1-1062
 	gen-1-1065
@@ -94,7 +97,7 @@ generated
 	gen-1-1160
 	gen-1-1162
 	gen-1-1164	strict
-	gen-1-1168	strict
+	gen-1-1168
 	gen-1-1169
 	gen-1-1170
 	gen-1-1171	strict
@@ -236,6 +239,7 @@ generated
 	gen-1-1416
 	gen-1-1417	strict
 	gen-1-1419
+	gen-1-1421	strict
 	gen-1-1422	strict
 	gen-1-1423
 	gen-1-1424
@@ -318,6 +322,7 @@ generated
 	gen-1-1546	strict
 	gen-1-1548
 	gen-1-1549
+	gen-1-1552	strict
 	gen-1-1554	strict
 	gen-1-1555	strict
 	gen-1-1557	strict
@@ -416,6 +421,7 @@ generated
 	gen-1-1722	strict
 	gen-1-1723
 	gen-1-1726
+	gen-1-1727	strict
 	gen-1-1730
 	gen-1-1731
 	gen-1-1732
@@ -459,6 +465,8 @@ generated
 	gen-1-1784
 	gen-1-1785
 	gen-1-1787
+	gen-1-1788	strict
+	gen-1-1792
 	gen-1-1793
 	gen-1-1794
 	gen-1-1795
@@ -471,11 +479,15 @@ generated
 	gen-1-1808
 	gen-1-1809
 	gen-1-1813
+	gen-1-1814
 	gen-1-1815
 	gen-1-1816
 	gen-1-1817
+	gen-1-1820	strict
+	gen-1-1821	strict
 	gen-1-1824	strict
 	gen-1-1827
+	gen-1-1828	strict
 	gen-1-1829
 	gen-1-183
 	gen-1-1832
@@ -499,7 +511,7 @@ generated
 	gen-1-1862
 	gen-1-1864
 	gen-1-1866
-	gen-1-1868	strict
+	gen-1-1868
 	gen-1-187
 	gen-1-1876
 	gen-1-1878
@@ -548,11 +560,13 @@ generated
 	gen-1-1956
 	gen-1-196
 	gen-1-1961
+	gen-1-1962
 	gen-1-1963
 	gen-1-1965	strict
 	gen-1-197
 	gen-1-1970
 	gen-1-1973
+	gen-1-1974	strict
 	gen-1-1975
 	gen-1-1976
 	gen-1-1977
@@ -615,6 +629,7 @@ generated
 	gen-1-2069
 	gen-1-2070
 	gen-1-2071	strict
+	gen-1-2072	strict
 	gen-1-2073
 	gen-1-2074
 	gen-1-2078
@@ -655,6 +670,7 @@ generated
 	gen-1-2146	strict
 	gen-1-2148
 	gen-1-2149
+	gen-1-215
 	gen-1-2150	strict
 	gen-1-2151
 	gen-1-2152
@@ -687,6 +703,7 @@ generated
 	gen-1-2206
 	gen-1-2207
 	gen-1-2209	strict
+	gen-1-2212
 	gen-1-2214
 	gen-1-2215	strict
 	gen-1-2216
@@ -725,6 +742,7 @@ generated
 	gen-1-2265
 	gen-1-2268	strict
 	gen-1-2271	strict
+	gen-1-2275	strict
 	gen-1-2277	strict
 	gen-1-2279
 	gen-1-228
@@ -747,6 +765,7 @@ generated
 	gen-1-2306
 	gen-1-2308	strict
 	gen-1-2313
+	gen-1-2316
 	gen-1-2318
 	gen-1-2319
 	gen-1-232	strict
@@ -776,6 +795,7 @@ generated
 	gen-1-236
 	gen-1-2361
 	gen-1-2364	strict
+	gen-1-2367
 	gen-1-2369
 	gen-1-2370	strict
 	gen-1-2371
@@ -789,6 +809,7 @@ generated
 	gen-1-2382	strict
 	gen-1-2383
 	gen-1-2384	strict
+	gen-1-2387	strict
 	gen-1-239
 	gen-1-2390
 	gen-1-2391
@@ -806,6 +827,8 @@ generated
 	gen-1-2417
 	gen-1-2422
 	gen-1-2424
+	gen-1-2425	strict
+	gen-1-2428	strict
 	gen-1-2430
 	gen-1-2432
 	gen-1-2438
@@ -818,6 +841,7 @@ generated
 	gen-1-2450	strict
 	gen-1-2452	strict
 	gen-1-2453	strict
+	gen-1-2455	strict
 	gen-1-2457
 	gen-1-2458
 	gen-1-2459
@@ -913,6 +937,7 @@ generated
 	gen-1-2614	strict
 	gen-1-2615
 	gen-1-2616	strict
+	gen-1-2617	strict
 	gen-1-2618	strict
 	gen-1-2620
 	gen-1-2623
@@ -949,6 +974,7 @@ generated
 	gen-1-2693
 	gen-1-2695
 	gen-1-2696
+	gen-1-2698
 	gen-1-270
 	gen-1-2700
 	gen-1-2702
@@ -1000,6 +1026,7 @@ generated
 	gen-1-2781
 	gen-1-2784
 	gen-1-2785
+	gen-1-2787	strict
 	gen-1-2788
 	gen-1-279
 	gen-1-2791	strict
@@ -1050,6 +1077,7 @@ generated
 	gen-1-2882	strict
 	gen-1-2883
 	gen-1-2889
+	gen-1-2894	strict
 	gen-1-2895
 	gen-1-2896	strict
 	gen-1-2899
@@ -1065,6 +1093,7 @@ generated
 	gen-1-2911
 	gen-1-2912
 	gen-1-2913
+	gen-1-2916	strict
 	gen-1-2917	strict
 	gen-1-2918	strict
 	gen-1-2919	strict
@@ -1082,7 +1111,9 @@ generated
 	gen-1-294
 	gen-1-2940
 	gen-1-2941
+	gen-1-2942	strict
 	gen-1-2943
+	gen-1-2944	strict
 	gen-1-2946
 	gen-1-2947
 	gen-1-2949
@@ -1114,8 +1145,10 @@ generated
 	gen-1-2991	strict
 	gen-1-2992
 	gen-1-2993
+	gen-1-2994	strict
 	gen-1-2995
 	gen-1-2997
+	gen-1-3	strict
 	gen-1-30	strict
 	gen-1-300
 	gen-1-3002
@@ -1137,6 +1170,7 @@ generated
 	gen-1-303
 	gen-1-3030
 	gen-1-3032
+	gen-1-3034	strict
 	gen-1-3035
 	gen-1-3036
 	gen-1-3038
@@ -1187,6 +1221,7 @@ generated
 	gen-1-3107	strict
 	gen-1-311	strict
 	gen-1-3113
+	gen-1-3114
 	gen-1-3115
 	gen-1-3117
 	gen-1-312
@@ -1233,7 +1268,7 @@ generated
 	gen-1-3187	strict
 	gen-1-3188
 	gen-1-3189
-	gen-1-319	strict
+	gen-1-319
 	gen-1-3190	strict
 	gen-1-3192
 	gen-1-3193
@@ -1287,6 +1322,8 @@ generated
 	gen-1-3284
 	gen-1-3285
 	gen-1-3286
+	gen-1-3287
+	gen-1-3291	strict
 	gen-1-3292
 	gen-1-3296
 	gen-1-3297
@@ -1300,6 +1337,7 @@ generated
 	gen-1-3312
 	gen-1-3313
 	gen-1-3314
+	gen-1-3315	strict
 	gen-1-3316	strict
 	gen-1-3317
 	gen-1-3322
@@ -1349,6 +1387,7 @@ generated
 	gen-1-340
 	gen-1-3400	strict
 	gen-1-3404
+	gen-1-3405
 	gen-1-3406
 	gen-1-3408
 	gen-1-3410	strict
@@ -1373,6 +1412,7 @@ generated
 	gen-1-3443	strict
 	gen-1-3444
 	gen-1-3448	strict
+	gen-1-3453	strict
 	gen-1-3454
 	gen-1-3455
 	gen-1-3456	strict
@@ -1384,6 +1424,7 @@ generated
 	gen-1-3466
 	gen-1-3468
 	gen-1-3469	strict
+	gen-1-3470
 	gen-1-3475
 	gen-1-3477	strict
 	gen-1-3479
@@ -1480,6 +1521,7 @@ generated
 	gen-1-3633
 	gen-1-3635	strict
 	gen-1-3639
+	gen-1-364	strict
 	gen-1-3640
 	gen-1-3641
 	gen-1-3642
@@ -1514,7 +1556,9 @@ generated
 	gen-1-3710
 	gen-1-3711
 	gen-1-3712	strict
+	gen-1-3713	strict
 	gen-1-3714	strict
+	gen-1-3716
 	gen-1-3720
 	gen-1-3725
 	gen-1-3728	strict
@@ -1535,6 +1579,7 @@ generated
 	gen-1-3755
 	gen-1-3759
 	gen-1-376
+	gen-1-3760
 	gen-1-3762
 	gen-1-3763
 	gen-1-3768
@@ -1543,6 +1588,7 @@ generated
 	gen-1-3770
 	gen-1-3772	strict
 	gen-1-3773	strict
+	gen-1-3774
 	gen-1-3776
 	gen-1-3777
 	gen-1-378
@@ -1661,6 +1707,8 @@ generated
 	gen-1-3963	strict
 	gen-1-3965
 	gen-1-3966
+	gen-1-3967
+	gen-1-3970	strict
 	gen-1-3972
 	gen-1-3975
 	gen-1-3979
@@ -1741,6 +1789,7 @@ generated
 	gen-1-4122	strict
 	gen-1-4125
 	gen-1-4126
+	gen-1-4128	strict
 	gen-1-4129	strict
 	gen-1-413
 	gen-1-4130
@@ -1753,6 +1802,7 @@ generated
 	gen-1-4137
 	gen-1-4138
 	gen-1-4139
+	gen-1-414	strict
 	gen-1-4140
 	gen-1-4141
 	gen-1-4145
@@ -1903,8 +1953,9 @@ generated
 	gen-1-4402	strict
 	gen-1-4405
 	gen-1-441
+	gen-1-4410	strict
 	gen-1-4412
-	gen-1-4413	strict
+	gen-1-4413
 	gen-1-4414
 	gen-1-4415
 	gen-1-4417	strict
@@ -1931,6 +1982,7 @@ generated
 	gen-1-4456
 	gen-1-4457
 	gen-1-4462
+	gen-1-4463	strict
 	gen-1-4464
 	gen-1-4466
 	gen-1-447
@@ -1979,6 +2031,7 @@ generated
 	gen-1-4547	strict
 	gen-1-4548	strict
 	gen-1-4551
+	gen-1-4552
 	gen-1-4553
 	gen-1-4555
 	gen-1-4557	strict
@@ -2008,6 +2061,7 @@ generated
 	gen-1-4608	strict
 	gen-1-4609
 	gen-1-4610
+	gen-1-4613	strict
 	gen-1-4614
 	gen-1-4615	strict
 	gen-1-4616
@@ -2029,6 +2083,7 @@ generated
 	gen-1-4636	strict
 	gen-1-4637
 	gen-1-4638	strict
+	gen-1-4641	strict
 	gen-1-4642
 	gen-1-4644
 	gen-1-4648
@@ -2054,6 +2109,7 @@ generated
 	gen-1-4686	strict
 	gen-1-4689
 	gen-1-469	strict
+	gen-1-4691	lax
 	gen-1-4695
 	gen-1-4696	strict
 	gen-1-4698
@@ -2092,6 +2148,7 @@ generated
 	gen-1-4754
 	gen-1-476	strict
 	gen-1-4761
+	gen-1-4767	strict
 	gen-1-4771
 	gen-1-4775
 	gen-1-4777
@@ -2104,6 +2161,7 @@ generated
 	gen-1-4784	strict
 	gen-1-4785
 	gen-1-4787
+	gen-1-4789	strict
 	gen-1-4790	strict
 	gen-1-4792
 	gen-1-4793
@@ -2119,6 +2177,7 @@ generated
 	gen-1-481	strict
 	gen-1-4812
 	gen-1-4813
+	gen-1-4818	strict
 	gen-1-4819
 	gen-1-482
 	gen-1-4824	strict
@@ -2151,7 +2210,10 @@ generated
 	gen-1-4866
 	gen-1-4869
 	gen-1-487
+	gen-1-4871	strict
+	gen-1-4874	strict
 	gen-1-4877
+	gen-1-4878
 	gen-1-4879
 	gen-1-488
 	gen-1-4886
@@ -2166,6 +2228,7 @@ generated
 	gen-1-4899
 	gen-1-49
 	gen-1-4901
+	gen-1-4904	strict
 	gen-1-4906
 	gen-1-4908
 	gen-1-4909	strict
@@ -2243,6 +2306,7 @@ generated
 	gen-1-543
 	gen-1-55	strict
 	gen-1-550
+	gen-1-551	strict
 	gen-1-552	strict
 	gen-1-553
 	gen-1-554	strict
@@ -2267,6 +2331,7 @@ generated
 	gen-1-580
 	gen-1-582
 	gen-1-584
+	gen-1-586	strict
 	gen-1-588
 	gen-1-589
 	gen-1-59
@@ -2385,6 +2450,7 @@ generated
 	gen-1-797
 	gen-1-802
 	gen-1-803
+	gen-1-804	strict
 	gen-1-807
 	gen-1-810	strict
 	gen-1-812
@@ -2407,11 +2473,13 @@ generated
 	gen-1-844	strict
 	gen-1-845
 	gen-1-847	strict
+	gen-1-848	strict
 	gen-1-850
 	gen-1-853	strict
 	gen-1-854
 	gen-1-855
 	gen-1-856
+	gen-1-859
 	gen-1-86
 	gen-1-860	strict
 	gen-1-861
@@ -2420,6 +2488,7 @@ generated
 	gen-1-866	strict
 	gen-1-867	strict
 	gen-1-869
+	gen-1-871	strict
 	gen-1-872
 	gen-1-874
 	gen-1-876
@@ -2427,6 +2496,7 @@ generated
 	gen-1-879
 	gen-1-88
 	gen-1-881	strict
+	gen-1-882
 	gen-1-884
 	gen-1-887
 	gen-1-892	strict
@@ -3951,6 +4021,7 @@ liquid-spec/liquid_ruby/case_when_matching.yml
 	case_repeats_body_for_each_matching_when_value
 liquid-spec/liquid_ruby/comparison_semantics.yml
 	comparison_of_number_and_string_is_an_error
+	comparison_with_non_ordered_type_is_false
 	string_less_than_or_equal_ordering
 	strings_compare_lexicographically
 liquid-spec/liquid_ruby/filter_argument_semantics.yml
@@ -4004,6 +4075,7 @@ liquid-spec/liquid_ruby/manual.yml
 	Case statement flows through multiple truthy cases
 	Case tag inside a Case tag
 	Comparing float greater or equal than integer
+	Comparing undefined variables in if statement
 	Find variable before assign in subscope
 	Find variable before initialization through decrement
 	Find variable before initialization through increment
@@ -4336,6 +4408,14 @@ liquid-spec/liquid_ruby/specs.yml
 	IfElseTagTest#test_comparison_of_expressions_starting_with_and_or_or_0ba70a25
 	IfElseTagTest#test_comparison_of_expressions_starting_with_and_or_or_5f9527af
 	IfElseTagTest#test_comparison_of_strings_containing_and_or_or_23fd4367
+	IfElseTagTest#test_comparisons_on_null_1cd6674b
+	IfElseTagTest#test_comparisons_on_null_512a6c01
+	IfElseTagTest#test_comparisons_on_null_a19cba0a
+	IfElseTagTest#test_comparisons_on_null_d334c885
+	IfElseTagTest#test_comparisons_on_null_db2349c3
+	IfElseTagTest#test_comparisons_on_null_e35d9f97
+	IfElseTagTest#test_comparisons_on_null_e6aa7304
+	IfElseTagTest#test_comparisons_on_null_fd5eeb1f
 	IfElseTagTest#test_else_if_1de1b125
 	IfElseTagTest#test_else_if_cacdd549
 	IfElseTagTest#test_else_if_ce6d494d
@@ -4430,6 +4510,7 @@ liquid-spec/liquid_ruby/specs.yml
 	OutputTest#test_variable_traversing_96d35ccb
 	OutputTest#test_variable_traversing_with_two_brackets_e2f6235e
 	ParsingQuirksTest#test_contains_in_id_1b35755f
+	ParsingQuirksTest#test_incomplete_expression_b16af5cc
 	RawTagTest#test_open_tag_in_raw_03444a59
 	RawTagTest#test_open_tag_in_raw_0522f4a1
 	RawTagTest#test_open_tag_in_raw_21bf763b
@@ -4645,6 +4726,8 @@ liquid-spec/liquid_ruby/specs.yml
 	StatementsTest#test_var_strings_equal_aec0cb52
 	StatementsTest#test_zero_lq_one_d16878d4
 	StatementsTest#test_zero_lq_or_equal_one_7d96c676
+	StatementsTest#test_zero_lq_or_equal_one_involving_nil_98b5b544
+	StatementsTest#test_zero_lq_or_equal_one_involving_nil_c75ce7fe
 	StatementsTest#test_zero_lqq_or_equal_one_903c7336
 	TemplateTest#test_using_range_literal_works_as_expected_fbd3ed79
 	TrimModeTest#test_complex_trim_55218681
@@ -4701,6 +4784,9 @@ liquid-spec/liquid_ruby/specs.yml
 	VariableTest#test_if_tag_calls_to_liquid_value_1a8da583
 	VariableTest#test_if_tag_calls_to_liquid_value_2159fa48
 	VariableTest#test_if_tag_calls_to_liquid_value_2914c337
+	VariableTest#test_if_tag_calls_to_liquid_value_9f617983
+	VariableTest#test_if_tag_calls_to_liquid_value_beb794c0
+	VariableTest#test_if_tag_calls_to_liquid_value_d3fc1f6e
 	VariableTest#test_if_tag_calls_to_liquid_value_e162081a
 	VariableTest#test_if_tag_calls_to_liquid_value_ebf53802
 	VariableTest#test_if_tag_calls_to_liquid_value_ffebcff7
@@ -5166,6 +5252,10 @@ liquid-spec/parser_errors/variable.yml
 	variable-mut-filter_first_arg-lookup-dot_number
 	variable-mut-value-lookup-dot_number
 liquid-spec/shopify_production_recordings/recorded_specs.yml
+	RecordedTest#test_all_order_comparisons_to_null_are_false_0860a6835
+	RecordedTest#test_all_order_comparisons_to_null_are_false_941dd3c08
+	RecordedTest#test_all_order_comparisons_to_null_are_false_cfbe14466
+	RecordedTest#test_all_order_comparisons_to_null_are_false_d34f6f127
 	RecordedTest#test_array_equality_06368e270
 	RecordedTest#test_array_equality_0bf709cdb
 	RecordedTest#test_array_equality_0e0558d41
@@ -5303,6 +5393,9 @@ liquid-spec/shopify_production_recordings/recorded_specs.yml
 	RecordedTest#test_case_or_bcbd0c2af
 	RecordedTest#test_comparison_error_formatting_28823c86a
 	RecordedTest#test_comparison_error_formatting_58d07791a
+	RecordedTest#test_comparison_error_formatting_80b236a77
+	RecordedTest#test_comparison_error_formatting_9bc1a9800
+	RecordedTest#test_comparison_error_formatting_c0d4ce4b7
 	RecordedTest#test_comparison_errors_7595d936
 	RecordedTest#test_comparison_errors_8141317d
 	RecordedTest#test_comparison_errors_d4f8ab6f
@@ -5394,11 +5487,41 @@ liquid-spec/shopify_production_recordings/recorded_specs.yml
 	RecordedTest#test_empty_ffb916425
 	RecordedTest#test_empty_for_069cd5000
 	RecordedTest#test_errors_when_comparing_uncomparable_types_039832b7a
+	RecordedTest#test_errors_when_comparing_uncomparable_types_0c9770b01
+	RecordedTest#test_errors_when_comparing_uncomparable_types_0e0675a7a
 	RecordedTest#test_errors_when_comparing_uncomparable_types_138e28b58
+	RecordedTest#test_errors_when_comparing_uncomparable_types_140638b27
+	RecordedTest#test_errors_when_comparing_uncomparable_types_187a935f1
+	RecordedTest#test_errors_when_comparing_uncomparable_types_1c6a5f75f
+	RecordedTest#test_errors_when_comparing_uncomparable_types_236ed93a0
+	RecordedTest#test_errors_when_comparing_uncomparable_types_2a2b38361
+	RecordedTest#test_errors_when_comparing_uncomparable_types_30685e9f9
+	RecordedTest#test_errors_when_comparing_uncomparable_types_346e9510a
+	RecordedTest#test_errors_when_comparing_uncomparable_types_39ba3d7ae
+	RecordedTest#test_errors_when_comparing_uncomparable_types_3a3eded43
+	RecordedTest#test_errors_when_comparing_uncomparable_types_3de29ef01
 	RecordedTest#test_errors_when_comparing_uncomparable_types_4092664ee
+	RecordedTest#test_errors_when_comparing_uncomparable_types_47333216a
+	RecordedTest#test_errors_when_comparing_uncomparable_types_56dda1544
+	RecordedTest#test_errors_when_comparing_uncomparable_types_5a083d2ee
+	RecordedTest#test_errors_when_comparing_uncomparable_types_621986d9b
 	RecordedTest#test_errors_when_comparing_uncomparable_types_73110a14b
+	RecordedTest#test_errors_when_comparing_uncomparable_types_77d274f0d
+	RecordedTest#test_errors_when_comparing_uncomparable_types_7af6b5ae3
+	RecordedTest#test_errors_when_comparing_uncomparable_types_82a35b491
+	RecordedTest#test_errors_when_comparing_uncomparable_types_a566d096e
+	RecordedTest#test_errors_when_comparing_uncomparable_types_af456729e
+	RecordedTest#test_errors_when_comparing_uncomparable_types_afd9b7221
 	RecordedTest#test_errors_when_comparing_uncomparable_types_bffd7be2e
+	RecordedTest#test_errors_when_comparing_uncomparable_types_cb1cb1cf5
+	RecordedTest#test_errors_when_comparing_uncomparable_types_d71e96ed1
+	RecordedTest#test_errors_when_comparing_uncomparable_types_da98ae914
+	RecordedTest#test_errors_when_comparing_uncomparable_types_de7bf4fe9
+	RecordedTest#test_errors_when_comparing_uncomparable_types_e3e2c6191
+	RecordedTest#test_errors_when_comparing_uncomparable_types_fb3221a33
 	RecordedTest#test_errors_when_comparing_uncomparable_types_fdb4f2920
+	RecordedTest#test_errors_when_comparing_uncomparable_types_fe3c77d91
+	RecordedTest#test_errors_when_comparing_uncomparable_types_ff73c4a4c
 	RecordedTest#test_escape_filter_works_39df01bf7
 	RecordedTest#test_escape_returns_falsey_value_when_fed_nil_00e2bf672
 	RecordedTest#test_first_3b9805ebf
