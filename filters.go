@@ -110,7 +110,10 @@ func (r *renderer) filters(v val, eval bool) val {
 		}
 		fn, registered := r.filterFns[name]
 		if !registered && r.dialect != nil && r.dialect.NoBuiltinFilters {
-			bail(at, "filter:"+name, "filter %q isn't registered, and the dialect has no built-ins", name)
+			if !r.passUnknown || liquidjsFilters[name] {
+				bail(at, "filter:"+name, "filter %q isn't registered, and the dialect has no built-ins", name)
+			}
+			continue // an unknown filter: its arguments were evaluated above
 		}
 		if registered {
 			if !eval {
