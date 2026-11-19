@@ -586,6 +586,8 @@
   {"name": "memory: join charges each item and separator", "spec": ["r-limit-memory"], "tpl": "{{ xs | join: ', ' }}", "data": {"xs": ["a", "b", "c", "d"]}, "out": "a, b, c, d", "mem": 12, "mistMem": 22},
   {"name": "memory: join's default separator", "spec": ["r-limit-memory"], "tpl": "{{ xs | join }}", "data": {"xs": ["a", "b"]}, "out": "a b", "mem": 4, "mistMem": 8},
   {"name": "memory: replace charges the text it adds", "spec": ["r-limit-memory"], "tpl": "{{ 'aaaa' | replace: 'a', 'bbbbbbbbbb' }}", "out": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "mem": 40, "mistMem": 60},
+  {"name": "memory: size, first, last, default and raw of an array charge 1", "spec": ["r-limit-memory"], "tpl": "{{ 'ab' | upcase }}{% for x in xs %}{{ xs | size }}{{ xs | first }}{{ xs | last }}{{ xs | default: 0 | size }}{{ xs | raw | size }}{% endfor %}", "data": {"xs": ["a", "b", "c"]}, "out": "AB3ac333ac333ac33", "mem": 2, "mistMem": 23},
+  {"name": "memory: size and last of a string charge its length, first 1", "spec": ["r-limit-memory"], "tpl": "{{ 'ab' | upcase }}{{ 'abc' | size }}{{ 'abc' | last }}{{ 'abc' | first }}", "out": "AB3ca", "mem": 2, "mistMem": 9},
   {"name": "memory: date charges its output", "spec": ["r-limit-memory"], "tpl": "{{ 0 | date: '%Y' | append: 'x' }}", "out": "1970x", "mem": 7, "mistMem": 35},
   {"name": "memory: a for range charges its items", "spec": ["r-limit-memory"], "tpl": "{% for i in (1..5) %}{{ i }}{% endfor %}", "out": "12345", "mem": 5},
   {"name": "memory: an assigned range charges its items", "spec": ["r-limit-memory"], "tpl": "{% assign r = (2..5) %}{{ r.size }}", "out": "4", "mem": 4},
