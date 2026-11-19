@@ -475,6 +475,9 @@ func (r *renderer) tag(b, e, next int, lt, rt bool) (int, bool) {
 				bail(b, "for-over-non-array", "for over non-array %T", coll)
 			}
 		}
+		if live && r.dialect != nil && r.dialect.RubyForElse {
+			f.taken = f.len() == 0
+		}
 		f.rev = mods.rev
 		f.active = f.len() > 0
 		r.push(f)

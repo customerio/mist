@@ -58,6 +58,10 @@ type Dialect struct {
 	// RawStrings reads string literals as Ruby Liquid's QuotedString does: a string
 	// ends at the first matching quote and keeps its backslashes.
 	RawStrings bool
+
+	// RubyForElse renders a for's else when the collection is empty after offset and
+	// limit, as Ruby Liquid does; liquidjs tests it before them.
+	RubyForElse bool
 }
 
 // Constructs is a set of template constructs a Dialect can reject.
