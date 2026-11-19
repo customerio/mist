@@ -1,6 +1,6 @@
-# mist Liquid subset — v0.44.x
+# mist Liquid subset — v0.45.x
 
-_Last updated 2026-11-18. Parity target: liquidjs 10.26.0 configured with `new Liquid({ lenientIf: true })`, running with `TZ=UTC` and the en-US locale._
+_Last updated 2026-11-19. Parity target: liquidjs 10.26.0 configured with `new Liquid({ lenientIf: true })`, running with `TZ=UTC` and the en-US locale._
 
 **Contract.** For every template and data where mist returns output, liquidjs returns the same output. Where mist returns `ErrUndefined`, liquidjs fails too, and where its `Path` is set, with exactly the message `Path`, `Line` and `Col` give (see Strict undefined error). Anything else returns `ErrUnsupported`, and the caller renders with the full engine. Bailing is always safe, so when in doubt, the spec bails. Every error is an `*Error` whose `Code` names the reason and stays the same across releases (`testdata/codes.txt` lists them), so callers can count bails by reason without parsing `Msg`. A panic in mist or in a registered tag, filter or dialect hook is recovered as `ErrInternal`, which wraps `ErrUnsupported` so the caller falls back; it means a bug, and `Error.Stack` says where.
 
@@ -13,7 +13,7 @@ _Last updated 2026-11-18. Parity target: liquidjs 10.26.0 configured with `new L
 ```ebnf
 template = { text | output | tag } ;
 text     = ? bytes up to the next "{{" or "{%" ? ;
-output   = "{{" [ "-" ] ws expr { filter } ws [ "-" ] "}}" ;
+output   = "{{" [ "-" ] ws value { filter } ws [ "-" ] "}}" ;
 filter   = "|" ident [ ":" [ expr { "," expr } { "," named } ] ] ;  (* at most 4 positional args; built-ins take the counts below; "f:" alone has none *)
 named    = "allow_false" ":" ( "true" | "false" ) ;           (* only default's, after its value *)
 tag      = "{%" [ "-" ] ws tagbody ws [ "-" ] "%}" ;
@@ -22,22 +22,21 @@ tagbody  = "if" fcond | "elsif" fcond | "else" | "endif"
          | "unless" fcond | "endunless"
          | "for" ident "in" ( path | range ) { [ "," ] forparam } | "else" | "endfor" | "break" | "continue"
          | "case" expr { filter } | "when" expr { ( "," | "or" ) expr } | "endcase"
-         | "assign" ident "=" expr { filter }
+         | "assign" ident "=" value { filter }
          | "capture" ( ident | string ) | "endcapture"
          | "comment" | "endcomment"
          | "raw" | "endraw"
          | "cycle" [ expr ":" ] expr { "," expr }
-         | "echo" [ expr { filter } ]
+         | "echo" [ value { filter } ]
          | ( "increment" | "decrement" ) ident
          | "liquid" { newline tagbody }                     (* one tag per line; not comment, raw or liquid *)
          | "#" { ? any ? }                                   (* every line starts with # *)
          | custom ;
 custom   = ident { ? any ? } ;                     (* only names registered in Engine.Tags *)
 
-fcond    = cond { filter } ;                            (* filters apply to the condition's value *)
-cond     = cmp [ ( "and" | "or" ) cond ] ;               (* right to left: a and b or c is a and (b or c) *)
-cmp      = expr [ op expr ] ;
-op       = "==" | "!=" | "<=" | ">=" | "<" | ">" | "contains" ;   (* contains: not followed by an ident character *)
+fcond    = value { filter } ;                           (* filters apply to the value's result *)
+value    = { op | expr } ;                              (* at least one; evaluated as an operand stack, see Operators *)
+op       = "==" | "!=" | "<=" | ">=" | "<" | ">" | "contains" | "and" | "or" | "not" ;   (* a word operator: not followed by a word character *)
 expr     = path | string | number | range | "true" | "false" | "nil" | "null" | "blank" | "empty" ;   (* blank, empty: only in conditions and output *)
 range    = "(" ws expr ws ".." ws expr ws ")" ;
 forparam = ( "limit" | "offset" ) ws ":" ws expr | "reversed" ;   (* each at most once *)
@@ -54,11 +53,11 @@ ws       = { " " | "\t" | "\n" | "\v" | "\f" | "\r" | U+00A0 } ;
 Structural rules the EBNF doesn't express:
 - <a id="r-blocks"></a>Blocks must nest and close: `if…endif` and `unless…endunless`, each with optional `elsif`s and at most one final `else`, `case…endcase` with any number of `when`s and at most one final `else`, `for…endfor` with no `else`, and `capture…endcapture`. `break`, `continue` and `forloop` must be inside a `for`. The maximum nesting depth is 1024.
 - <a id="r-comment"></a>`comment … endcomment`: the body is tokenized but ignored. A nested `comment` or `raw`, or a tag with no name, bails.
-- <a id="r-reserved-root"></a>`contains`, `and`, `or` and `not` can't be variable names at the root of a path; liquidjs parses them as operators. They are fine as properties (`a.and`). Literal keywords can't start a path either (`for x in nil` bails).
+- <a id="r-reserved-root"></a>`contains`, `and`, `or` and `not` are operators wherever a `value` reads one, unless a word character follows (`containsx` is a variable). Elsewhere they can't be variable names at the root of a path. They are fine as properties (`a.and`). Literal keywords can't start a path either (`for x in nil` bails).
 - <a id="r-raw"></a>`raw … endraw`: the body is emitted verbatim. Trim markers on either tag bail.
 - <a id="r-tag-end"></a>Tags end at the first `%}`, even inside quotes, as in liquidjs. Outputs end at the first `}}` outside quotes; a backslash-escaped quote doesn't close a quote.
 - <a id="r-tokens"></a>A number can't be followed by `.`, an identifier character or a non-blank non-ASCII character (`1.2.3` and `1x` bail), or be too large for a float64. Inside tags, Unicode blanks other than U+00A0 bail, though liquidjs skips them.
-- <a id="r-condition-filter-order"></a>Filters on a condition must come after the whole `and`/`or` chain; a filter before an operator (`a | upcase == "X"`) is a liquidjs syntax error and bails.
+- <a id="r-condition-filter-order"></a>Filters on a condition must come after the whole `value`; a filter before an operator (`a | upcase == "X"`) is a liquidjs syntax error and bails.
 - <a id="r-dead-branch"></a>Dead branches are parsed, not skipped. A syntax error or unknown tag anywhere bails, because liquidjs rejects the whole template.
 
 ## Semantics
@@ -115,7 +114,8 @@ Structural rules the EBNF doesn't express:
 | <a id="r-date-tz"></a>`date` timezone | Without one, times print in UTC and `%z` is `+0000`. A string is an IANA name or alias resolved with Go's `time.LoadLocation`; `%Z` prints it as written. A number is minutes west of UTC, as JavaScript's `getTimezoneOffset` counts them; `%Z` prints the offset. Either way `%s` shifts by the offset, as it does in liquidjs. Programs deployed without a system tz database can import `time/tzdata`. |
 | <a id="r-ordering"></a>`<` `>` `<=` `>=` | Two numbers, two ASCII strings (byte order), or a number and a string, which compare as numbers with the string read as JavaScript's `Number` reads it (`'abc'` is NaN, so every ordering with it is false). |
 | <a id="r-and-or"></a>`and` / `or` | Grouped right to left, as in liquidjs: `a and b or c` is `a and (b or c)`. Every operand is evaluated. |
-| <a id="r-filtered-condition"></a>Filtered conditions | `{% if a.b \| default: false %}`: the filters apply to the condition's value (a lone operand's value, else the `and`/`or` result as `true`/`false`), then truthiness decides. The operand stays lenient under strict, as in any condition. |
+| <a id="r-operators"></a>Operators | A `value` is liquidjs's `Expression`: its operands and operators, in any order, are applied in postfix order, where an operator only pops operators of higher precedence (comparisons, then `not`, then `and` and `or`), so equal ones group right to left. `and`, `or` and comparisons give `true` or `false`; `not a` is `a`'s falsiness. An operator short of operands gets undefined for each (`{% if a == %}` is `undefined == a`; `{{ not }}` is `true`). The result is the bottom of the stack, so after a complete expression a further operand is evaluated and ignored: `{% if a b %}` is `{% if a %}`, `a == b == c` is `a == (b == c)`, and `{{ a and b }}` prints `true` or `false`. Under strict, an output, `echo` or `assign` with an operator and an undefined variable, followed by filters, bails (`strict-loose-default`): a leading `default` would read it as null, which compares unlike undefined. So does an undefined index after an earlier operand's undefined variable, since which one liquidjs reports depends on a leading `default`. |
+| <a id="r-filtered-condition"></a>Filtered conditions | `{% if a.b \| default: false %}`: the filters apply to the condition's value (the result of its `value`), then truthiness decides. The operand stays lenient under strict, as in any condition. |
 | <a id="r-index"></a>`.` and `[ ]` | `a.k` and `a["k"]` read object keys; a dot may be followed by blanks. On arrays, integers and integer strings as JavaScript prints them (`1`, `-1`, `"2"`) index, negative from the end, and other digit strings (`01`) are undefined. `a[k]` evaluates `k` first: a string reads that key, a number indexes an array or reads the key `String(n)` of an object, and a non-integer index of an array is undefined. Under strict, an undefined variable inside `[ ]` is `ErrUndefined` even where the rest is lenient (a leading `default`, a condition), as in liquidjs. |
 | <a id="r-string-literal"></a>String literals | Escapes as liquidjs's `parseStringLiteral`: `\b \f \n \r \t \v`; `\u` with up to 4 hex digits (none gives U+0000); up to 3 octal digits; any other escaped character as itself (`\'`, `\"`, `\\`, `\x` → `x`). |
 | <a id="r-whitespace"></a>Whitespace control | `{{-`/`{%-` trim the template text before; `-}}`/`-%}` trim the template text after. Rendered values are never trimmed. The trimmed set is ASCII whitespace plus U+00A0, U+1680, U+180E, U+2000–200A, U+2028, U+2029, U+202F, U+205F, U+3000. |
@@ -192,11 +192,14 @@ liquidjs's `renderLimit` (a time budget) has no counterpart. mist renders far fa
 | `Output(dst, v)` | Prints non-string values: numbers, bools, arrays, objects, and the `blank` and `empty` keywords. Strings, nil and undefined are printed by mist as usual. |
 | `Compare(op, a, b)` | Evaluates `==`, `!=`, `<`, `>`, `<=`, `>=` in conditions, and matches each `when` value against the `case` value as `Compare("==", case, when)`. Truthiness and `and`/`or` are unchanged. A `mist.Comparer` on either side compares itself instead. |
 | `Contains(a, b)` | Evaluates `a contains b` in conditions, `contains nil` included (the `nil` arrives as `nil`). |
-| `Reject` | A set of constructs that bail in both `Render` and `Check`, including in dead branches: `TrimMarkers`, `NegativeLiterals` (including negative indexes), `UnspacedOperators` (a comparison operator with no whitespace before it, such as `x==2`), `RawBlocks`, `BlankKeyword`, `EmptyKeyword`. |
+| `Reject` | A set of constructs that bail in both `Render` and `Check`, including in dead branches: `TrimMarkers`, `NegativeLiterals` (including negative indexes), `UnspacedOperators` (a comparison operator with no whitespace before it, such as `x==2`), `RawBlocks`, `BlankKeyword`, `EmptyKeyword`, `LooseExpressions` (a condition beyond `cmp { ( "and" \| "or" ) cmp }` with `cmp = expr [ op expr ]`, or another `value` with more than one operand or any operator: `{% if a b %}`, `not`, `a == b == c`, a dangling operator, `{{ a and b }}`). |
 | `NumberText` | Number literals reach hooks and registered filters as `json.Number` holding their text, so `2.0` and `2` stay distinct (Ruby's Float and Integer). |
 | `NoBuiltinFilters` | Only registered filters run: any other filter, `default` included, bails with `filter:NAME`, as does a registered filter returning `ErrBuiltin`. |
 | `StrictAssign` | Under strict, an undefined variable in an `assign` value is `ErrUndefined`, as in Ruby Liquid; liquidjs reads it leniently. |
-| `RubyLookups` | Variables are looked up as Ruby Liquid's `Context#variable` does. When the first segment is `nil` or `false`, the whole lookup is that value (`{{ c.x }}` with a `false` `c` prints `false`). Past it, a property or index of `nil` or `false` is undefined, so `ErrUndefined` under strict. An Integer index of a Hash, or a non-negative one past an Array's end, is `nil` (`{{ c[0] }}` with an empty `c` prints nothing under strict), as Ruby's `fetch` returns it without raising. liquidjs reads a property of `null` as `null`. |
+| `RubyLookups` | Variables are looked up as Ruby Liquid's `Context#variable` does. When the first segment is `nil` or `false`, the whole lookup is that value (`{{ c.x }}` with a `false` `c` prints `false`). Past it, a property or index of `nil` or `false` is undefined, so `ErrUndefined` under strict. A bracket index reads a Hash by a String key it has and an Array by an Integer; an Integer index of a Hash, or a non-negative one past an Array's end, is `nil` (`{{ c[0] }}` with an empty `c` prints nothing under strict), as Ruby's `fetch` returns it without raising. Any other index of a Hash, Array, String, Integer or `true` is undefined: a String key of an Array (`c['0']`, `c['size']`), a Float (`c[1.5]`, `c[1.0]` under `NumberText`), `nil`, a boolean, an Array or a Hash. An index of a Float bails. Under strict, an undefined index in a condition is `nil`, as Ruby's conditions read it, where liquidjs raises. liquidjs reads a property of `null` as `null`, and keys an Array by an integer string and an object by `String(k)`. Only a property (`.size`), never an index (`['size']`), computes `size`, `first` and `last`, and strings have them too, counted in characters (`s.size` is `3` and `s.first` is `é` when `s` is `é😀x`, and `.first` of `""` is `""`). A Hash's computed `first`, which Ruby reads as its first pair, bails (`dialect-ruby-hash-first`). |
+| `RubyLax` | Conditions, outputs and `assign` values are read as Ruby Liquid 2.5's lax parser reads them. A condition is `and`/`or`-joined segments of `operand [ op [ operand ] ]`, grouped right to left: a missing right operand is nil, `<>` is `!=`, and the rest of a segment, filters included, is ignored (`{% if a == 1 t %}` is `{% if a == 1 %}`, `{% if a \| f %}` is `{% if a %}`). An output's or assign's value is its first operand, then the filters from the first `\|` (`{{ a b \| upcase }}` is `{{ a \| upcase }}`). Bails where Ruby raises or mist can't split the markup exactly as Ruby's `QuotedFragment` does: an unknown operator (`a = 1`, `a b`; `dialect-ruby-operator`), an operand glued to more (`a==1`; `dialect-ruby-fragment`), a quote in skipped text (`dialect-ruby-skipped-quote`), and `and`/`or` with no operand or glued to punctuation (`dialect-ruby-and-or`). |
+| `RawStrings` | String literals are read as Ruby Liquid's `QuotedString`: a string ends at the first matching quote and keeps its backslashes (`{{ "a\nb" }}` prints `a\nb`, `{{ "a\" }}` prints `a\`). An output's closing `}}` is found the same way. liquidjs unescapes `\n`, `\u00e9`, octal and escaped quotes. |
+| `RubyForElse` | A `for`'s `else` renders when the collection is empty after `offset` and `limit`, as in Ruby Liquid (`{% for x in xs offset: 3 %}…{% else %}E{% endfor %}` over three items prints `E`). liquidjs renders it only when the collection was empty before them. |
 | `NoDefaultLeniency` | Turns off the leading-`default` leniency rule. Combine with an overriding `default` in `Engine.Filters` to change `default` itself. |
 
 - **Values the hooks see:** data values as the caller supplied them (decode with `json.Decoder.UseNumber` to keep `2.0` distinct from `2`), `int64` for integral number literals and results (`3`, `2 | times: 1`) and `float64` for fractional ones (`1.5`), `nil` for nil, undefined and the `nil` literal (but `mist.Undefined{}` for undefined inside arrays and objects), and `mist.Blank` and `mist.Empty` for those keywords.

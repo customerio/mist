@@ -75,6 +75,7 @@ type renderer struct {
 	binds        []binding // expression filter items, innermost last
 	exps         int       // *_exp expressions being evaluated
 	lenientUndef bool      // a lenient path met an undefined variable under strict
+	afterUndef   bool      // the next path follows an operand that met an undefined variable
 	floor        int       // frames a Tag.Render inherited, which its tags can't close or break out of
 	nested       int       // Tag.Render depth
 	scope        *tagScope // what custom tags see, allocated on the first call so the renderer stays on the stack
@@ -210,7 +211,7 @@ func (r *renderer) run() {
 			r.checkOutput(start)
 			break
 		}
-		b, e, next, lt, rt := delimBounds(s, start, isTag)
+		b, e, next, lt, rt := r.delimBounds(s, start, isTag)
 		if (lt || rt) && r.rejects(TrimMarkers) {
 			bail(start, "dialect-trim-markers", "trim markers are rejected by the dialect")
 		}
@@ -265,7 +266,7 @@ func nextDelim(s string, pos int) (int, bool) {
 
 // delimBounds returns the body [b,e) of the tag or output at start, excluding
 // trim markers, and the offset just past its closer.
-func delimBounds(s string, start int, isTag bool) (b, e, next int, lt, rt bool) {
+func (r *renderer) delimBounds(s string, start int, isTag bool) (b, e, next int, lt, rt bool) {
 	b = start + 2
 	if b < len(s) && s[b] == '-' {
 		lt = true
@@ -279,7 +280,7 @@ func delimBounds(s string, start int, isTag bool) (b, e, next int, lt, rt bool) 
 		}
 		e = b + k
 	} else {
-		e = closeOutput(s, b, start)
+		e = closeOutput(s, b, start, r.rawStrings())
 	}
 	next = e + 2
 	if e > b && s[e-1] == '-' {
@@ -290,11 +291,11 @@ func delimBounds(s string, start int, isTag bool) (b, e, next int, lt, rt bool) 
 }
 
 // closeOutput finds the "}}" closing an output, skipping quoted strings as liquidjs does.
-func closeOutput(s string, i, start int) int {
+func closeOutput(s string, i, start int, raw bool) int {
 	for i < len(s) {
 		switch c := s[i]; c {
 		case '"', '\'':
-			if i = quotedEnd(s, i); i < 0 {
+			if i = quotedEnd(s, i, raw); i < 0 {
 				bail(start, "unterminated-string", "unterminated string")
 			}
 		case '}':
@@ -315,8 +316,9 @@ func (r *renderer) output(b, e int) {
 	live := r.live()
 	r.ws()
 	start := r.p
-	v := r.expr(live, false)
-	text := r.src[start:r.p]
+	v, lone, end := r.value(live, false, false)
+	text := r.src[start:end]
+	r.strictLoose(lone, b)
 	if k := v.keyword(); k != "" {
 		if r.ws(); r.peek() == '|' {
 			bail(b, "keyword-outside-equality", "%s is only supported in conditions and output", k)
@@ -473,6 +475,9 @@ func (r *renderer) tag(b, e, next int, lt, rt bool) (int, bool) {
 				bail(b, "for-over-non-array", "for over non-array %T", coll)
 			}
 		}
+		if live && r.dialect != nil && r.dialect.RubyForElse {
+			f.taken = f.len() == 0
+		}
 		f.rev = mods.rev
 		f.active = f.len() > 0
 		r.push(f)
@@ -528,7 +533,8 @@ func (r *renderer) tag(b, e, next int, lt, rt bool) (int, bool) {
 			bail(b, "assign-syntax", "expected: assign <ident> = <expr>")
 		}
 		r.p++
-		val := r.expr(live, r.dialect == nil || !r.dialect.StrictAssign)
+		val, lone, _ := r.value(live, r.dialect == nil || !r.dialect.StrictAssign, false)
+		r.strictLoose(lone, b)
 		if k := val.keyword(); k != "" {
 			bail(b, "keyword-outside-equality", "%s is only supported in conditions and output", k)
 		}
@@ -556,7 +562,8 @@ func (r *renderer) tag(b, e, next int, lt, rt bool) (int, bool) {
 		if r.p == len(r.src) {
 			break // liquidjs's echo of nothing
 		}
-		v := r.expr(live, false)
+		v, lone, _ := r.value(live, false, false)
+		r.strictLoose(lone, b)
 		if k := v.keyword(); k != "" {
 			if r.ws(); r.peek() == '|' || r.dialect != nil && r.dialect.Output != nil {
 				bail(b, "keyword-outside-equality", "%s is only supported in conditions and output", k)
@@ -803,7 +810,7 @@ func (r *renderer) skipComment(pos int) (int, bool) {
 		if start == len(s) {
 			bail(pos, "unclosed-comment", "unclosed comment")
 		}
-		b, e, next, lt, rt := delimBounds(s, start, isTag)
+		b, e, next, lt, rt := r.delimBounds(s, start, isTag)
 		if (lt || rt) && r.rejects(TrimMarkers) {
 			bail(start, "dialect-trim-markers", "trim markers are rejected by the dialect")
 		}

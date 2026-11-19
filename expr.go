@@ -110,62 +110,349 @@ func (r *renderer) ident() string {
 	return s
 }
 
-// fcond = cond { filter }
+// fcond = value { filter }
 // Returns false when not evaluating. Undefined variables are lenient (lenientIf).
 func (r *renderer) fcond(eval bool) bool {
-	res, v, lone := r.cond(eval)
-	if r.peek() != '|' {
-		return res
+	if r.rubyLax() {
+		return r.rubyCond(eval)
 	}
-	if k := v.keyword(); lone && k != "" {
-		bail(r.pos(), "keyword-outside-equality", "%s is only supported in conditions and output", k)
-	}
-	// liquidjs filters the whole condition's value: a lone operand's, else the boolean.
-	if !lone {
-		v = val{x: res}
-	}
+	v, _, _ := r.value(eval, true, true)
 	at := r.pos()
-	v = r.filters(v, eval)
+	if r.peek() == '|' {
+		if k := v.keyword(); k != "" {
+			bail(at, "keyword-outside-equality", "%s is only supported in conditions and output", k)
+		}
+		v = r.filters(v, eval) // liquidjs filters the expression's value
+	}
 	r.end()
 	return eval && truthy(v, at)
 }
 
-// cond = cmp [ ( "and" | "or" ) cond ]. The recursion groups right to left, as
-// liquidjs does: a and b or c is a and (b or c).
-func (r *renderer) cond(eval bool) (res bool, first val, lone bool) {
-	res, first, lone = r.cmp(eval)
-	r.ws()
-	if r.p == len(r.src) || r.peek() == '|' {
-		return res, first, lone
-	}
-	at := r.pos()
-	w := r.ident()
-	if w != "and" && w != "or" {
-		bail(at, "expected-and-or", "expected and/or, got %q", r.src[at-r.base:])
-	}
-	rest, _, _ := r.cond(eval)
-	if w == "and" {
-		return res && rest, first, false
-	}
-	return res || rest, first, false
+// operand is a value on value's stack, with where it starts.
+type operand struct {
+	v  val
+	at int
 }
 
-// cmp = expr [ op expr ]
-func (r *renderer) cmp(eval bool) (bool, val, bool) {
+// operator is an operator on value's stack, with where it ends.
+type operator struct {
+	op string
+	at int
+}
+
+// precedence is liquidjs's operator precedence.
+func precedence(op string) int {
+	switch op {
+	case "and", "or":
+		return 0
+	case "not":
+		return 1
+	}
+	return 2
+}
+
+// value = { op | expr }, read and evaluated as liquidjs's Tokenizer.readExpression and
+// Expression do: operands and operators in any order, applied in postfix order, where an
+// operator only pops operators of higher precedence, so equal ones group right to left
+// (a and b or c is a and (b or c)). An operator short of operands gets undefined. The
+// result is the bottom of the stack, so an operand after a complete expression is
+// evaluated and ignored. lone reports a single operand; end is where the first ends.
+// Anything outside cond (in a condition) or a lone operand (elsewhere) bails when the
+// dialect rejects LooseExpressions.
+func (r *renderer) value(eval, lenient, inCond bool) (v val, lone bool, end int) {
+	if !inCond && r.rubyLax() {
+		return r.rubyValue(eval, lenient)
+	}
 	start := r.pos()
-	a := r.expr(eval, true)
-	before := r.p
 	r.ws()
-	spaced := r.p > before
-	op := r.op()
-	if op != "" && !spaced && r.rejects(UnspacedOperators) {
-		bail(r.pos(), "dialect-unspaced-operator", "operators without whitespace before them are rejected by the dialect")
+	if p := r.p; r.op() != "" || !r.valueStart() {
+		r.p = p
+		return r.operands(eval, lenient, inCond, start, p, nil)
 	}
-	if op == "" {
-		return eval && truthy(a, r.pos()), a, true
+	first := operand{at: r.pos()}
+	first.v = r.expr(eval, lenient)
+	end = r.p
+	if r.ws(); r.p == len(r.src) || r.peek() == '|' {
+		return first.v, true, end
 	}
+	r.p = end
+	return r.operands(eval, lenient, inCond, start, end, &first)
+}
+
+// operands is value from its first operand, if read.
+func (r *renderer) operands(eval, lenient, inCond bool, start, end int, first *operand) (v val, lone bool, _ int) {
+	var vb [4]operand
+	var ob [4]operator
+	vals, ops := vb[:0], ob[:0]
+	// cond's grammar: 0 wants an operand, 1 an operator, 2 a compared operand, 3 and/or.
+	state, strict, n := 0, true, 0
+	lone = true
+	if first != nil {
+		vals, state, n = append(vals, *first), 1, 1
+	}
+	for {
+		before := r.p
+		r.ws()
+		if op := r.op(); op != "" {
+			if r.p-len(op) == before && n > 0 && precedence(op) == 2 && r.rejects(UnspacedOperators) {
+				bail(r.pos(), "dialect-unspaced-operator", "operators without whitespace before them are rejected by the dialect")
+			}
+			for len(ops) > 0 && precedence(ops[len(ops)-1].op) > precedence(op) {
+				vals = r.apply(vals, ops[len(ops)-1], eval)
+				ops = ops[:len(ops)-1]
+			}
+			ops = append(ops, operator{op, r.pos()})
+			strict = strict && op != "not"
+			lone = false
+			switch op {
+			case "and", "or":
+				strict = strict && (state == 1 || state == 3)
+				state = 0
+			default:
+				strict = strict && state == 1
+				state = 2
+			}
+			continue
+		}
+		if !r.valueStart() {
+			break
+		}
+		at := r.pos()
+		r.afterUndef = n > 0 && (r.undef.set || r.exps > 0 && r.lenientUndef)
+		x := r.expr(eval, lenient)
+		r.afterUndef = false
+		if n == 0 {
+			end = r.p
+		}
+		n++
+		vals = append(vals, operand{x, at})
+		switch state {
+		case 0:
+			state = 1
+		case 2:
+			state = 3
+		default:
+			strict = false
+		}
+	}
+	if n == 0 && len(ops) == 0 {
+		bail(start, "expected-expression", "expected expression")
+	}
+	for len(ops) > 0 {
+		vals = r.apply(vals, ops[len(ops)-1], eval)
+		ops = ops[:len(ops)-1]
+	}
+	lone = lone && n == 1
+	if loose := !lone && (!inCond || !strict || state == 0 || state == 2); loose && r.rejects(LooseExpressions) {
+		bail(start, "dialect-loose-expression", "an expression outside the dialect's grammar")
+	}
+	return vals[0].v, lone, end
+}
+
+func (r *renderer) rubyLax() bool { return r.dialect != nil && r.dialect.RubyLax }
+
+func (r *renderer) rawStrings() bool { return r.dialect != nil && r.dialect.RawStrings }
+
+// rubyCond is a condition as Ruby's If reads it: segments `operand [op [operand]]`
+// joined by and/or, grouped right to left; text after a segment's operands is ignored.
+func (r *renderer) rubyCond(eval bool) bool {
+	var rb [8]bool
+	var ob [8]bool // true for and
+	res, ands := rb[:0], ob[:0]
+	for {
+		r.ws()
+		if r.andOr() != "" || r.p == len(r.src) {
+			bail(r.pos(), "dialect-ruby-and-or", "and/or where Ruby expects an operand")
+		}
+		a := r.rubyOperand(eval, true)
+		r.ws()
+		op, at := r.rubyOp(), r.pos()
+		seg := false
+		if op == "" {
+			seg = eval && truthy(a.v, at)
+		} else {
+			r.ws()
+			b := operand{val{x: nil}, at}
+			if c := r.peek(); r.p < len(r.src) && c != ',' && c != '|' && r.andOr() == "" {
+				b = r.rubyOperand(eval, true)
+			}
+			seg = r.cmp(op, a, b, at, eval)
+		}
+		res = append(res, seg)
+		r.rubyJunk()
+		w := r.andOr()
+		if w == "" {
+			break // the end
+		}
+		r.p += len(w)
+		ands = append(ands, w == "and")
+	}
+	v := res[len(res)-1]
+	for i := len(ands) - 1; i >= 0; i-- {
+		if ands[i] {
+			v = res[i] && v
+		} else {
+			v = res[i] || v
+		}
+	}
+	return eval && v
+}
+
+// rubyValue is an output's or assign's value as Ruby's Variable reads it: the first
+// operand, then filters from the first |.
+func (r *renderer) rubyValue(eval, lenient bool) (val, bool, int) {
+	r.ws()
+	v := r.rubyOperand(eval, lenient)
+	end := r.p
+	for ; r.p < len(r.src) && r.src[r.p] != '|'; r.p++ {
+		if c := r.src[r.p]; c == '"' || c == '\'' {
+			bail(r.pos(), "dialect-ruby-skipped-quote", "a quote in text Ruby skips, where it finds | inside strings too")
+		}
+	}
+	return v.v, true, end
+}
+
+// rubyOperand is an operand that is exactly one Ruby QuotedFragment: it ends at a
+// blank, ',', '|' or the end, and holds no blank.
+func (r *renderer) rubyOperand(eval, lenient bool) operand {
 	at := r.pos()
-	b := r.expr(eval, true)
+	if !r.valueStart() {
+		bail(at, "dialect-ruby-fragment", "an operand Ruby reads differently")
+	}
+	start := r.p
+	v := r.expr(eval, lenient)
+	if c := r.peek(); r.p < len(r.src) && !isBlank(c) && c != ',' && c != '|' || unquotedBlank(r.src[start:r.p]) {
+		bail(at, "dialect-ruby-fragment", "an operand Ruby reads differently")
+	}
+	return operand{v, at}
+}
+
+// unquotedBlank reports a blank in s outside quotes, where a Ruby QuotedFragment ends.
+func unquotedBlank(s string) bool {
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; {
+		case c == '"' || c == '\'':
+			if k := strings.IndexByte(s[i+1:], c); k >= 0 {
+				i += k + 1
+			}
+		case isBlank(c), c == 0xC2 && i+1 < len(s) && s[i+1] == 0xA0:
+			return true
+		}
+	}
+	return false
+}
+
+// rubyOp reads Ruby's operator run, [=!<>a-z_]+, as the operator mist compares
+// with, or "" for none. An and/or word is no operator, and an unknown one bails.
+func (r *renderer) rubyOp() string {
+	if r.andOr() != "" {
+		return ""
+	}
+	j := r.p
+	for j < len(r.src) {
+		if c := r.src[j]; c == '=' || c == '!' || c == '<' || c == '>' || c == '_' || c >= 'a' && c <= 'z' {
+			j++
+		} else {
+			break
+		}
+	}
+	op := r.src[r.p:j]
+	switch op {
+	case "":
+		return ""
+	case "<>":
+		op = "!="
+	case "==", "!=", "<", ">", "<=", ">=", "contains":
+	default:
+		bail(r.pos(), "dialect-ruby-operator", "unknown operator %q, which Ruby raises on", op)
+	}
+	r.p = j
+	return op
+}
+
+// andOr is the and/or at r.p that Ruby splits a condition on, or "". One glued to
+// anything but a word character or blank bails.
+func (r *renderer) andOr() string {
+	rest := r.src[r.p:]
+	for _, w := range [...]string{"and", "or"} {
+		if !strings.HasPrefix(rest, w) {
+			continue
+		}
+		if len(rest) == len(w) || isBlank(rest[len(w)]) {
+			return w
+		}
+		if c := rest[len(w)]; c == '_' || c >= '0' && c <= '9' || c|0x20 >= 'a' && c|0x20 <= 'z' {
+			return "" // a longer word
+		}
+		bail(r.pos(), "dialect-ruby-and-or", "%s glued to %q, which Ruby splits on", w, rest[len(w)])
+	}
+	return ""
+}
+
+// rubyJunk skips the tokens after a segment, up to an and/or or the end.
+func (r *renderer) rubyJunk() {
+	for {
+		r.ws()
+		if r.p == len(r.src) || r.andOr() != "" {
+			return
+		}
+		for ; r.p < len(r.src) && !isBlank(r.src[r.p]); r.p++ {
+			if c := r.src[r.p]; c == '"' || c == '\'' {
+				bail(r.pos(), "dialect-ruby-skipped-quote", "a quote in text Ruby skips")
+			}
+		}
+	}
+}
+
+// strictLoose bails where a strict undefined met an operator ahead of filters: a leading
+// default would make liquidjs read it as null, which compares unlike undefined.
+func (r *renderer) strictLoose(lone bool, at int) {
+	if !lone && r.undef.set {
+		if r.ws(); r.peek() == '|' {
+			bail(at, "strict-loose-default", "an undefined variable in an expression with operators, before filters, under strict")
+		}
+	}
+}
+
+// valueStart reports whether expr can start here.
+func (r *renderer) valueStart() bool {
+	switch c := r.peek(); {
+	case c == '"', c == '\'', c == '-', c == '+', c == '(', isDigit(c), isIdentStart(c):
+		return true
+	}
+	return wordRune(r.src, r.p) > 0
+}
+
+// apply pops o's operands from vals, an undefined for each missing one, and pushes
+// its result.
+func (r *renderer) apply(vals []operand, o operator, eval bool) []operand {
+	b, vals := pop(vals, o.at)
+	if o.op == "not" {
+		return append(vals, operand{val{x: eval && !truthy(b.v, o.at)}, b.at})
+	}
+	a, vals := pop(vals, o.at)
+	var res bool
+	switch o.op {
+	case "and":
+		res = eval && truthy(a.v, o.at) && truthy(b.v, o.at)
+	case "or":
+		res = eval && (truthy(a.v, o.at) || truthy(b.v, o.at))
+	default:
+		res = r.cmp(o.op, a, b, o.at, eval)
+	}
+	return append(vals, operand{val{x: res}, a.at})
+}
+
+func pop(vals []operand, at int) (operand, []operand) {
+	if len(vals) == 0 {
+		return operand{val{x: Undefined{}}, at}, vals
+	}
+	return vals[len(vals)-1], vals[:len(vals)-1]
+}
+
+// cmp evaluates a op b.
+func (r *renderer) cmp(op string, l, rt operand, at int, eval bool) bool {
+	a, b, start := l.v, rt.v, l.at
 	if k, other := a.keyword(), b; k != "" || b.keyword() != "" {
 		if k == "" {
 			k, other = b.keyword(), a
@@ -175,7 +462,7 @@ func (r *renderer) cmp(eval bool) (bool, val, bool) {
 			bail(start, "keyword-outside-equality", "%s is only supported with ==, !=, <, >, <= and >=", k)
 		case op != "==" && op != "!=":
 			if r.dialect == nil || r.dialect.Compare == nil {
-				return false, a, false // liquidjs's EmptyDrop orders before and after nothing
+				return false // liquidjs's EmptyDrop orders before and after nothing
 			}
 		case other.keyword() != "" || isNilLit(other):
 			bail(start, "keyword-against-keyword", "%s compared with blank, empty or nil", k) // liquidjs is asymmetric here
@@ -183,7 +470,7 @@ func (r *renderer) cmp(eval bool) (bool, val, bool) {
 	}
 	if op == "contains" {
 		if r.dialect != nil && r.dialect.Contains != nil {
-			return eval && r.dialectContains(a, b, at), a, false
+			return eval && r.dialectContains(a, b, at)
 		}
 		if isNilLit(b) {
 			bail(at, "contains-nil", "contains nil") // liquidjs searches for "null"
@@ -191,32 +478,62 @@ func (r *renderer) cmp(eval bool) (bool, val, bool) {
 		if r.dialect != nil && r.dialect.Compare != nil {
 			bail(at, "dialect-contains", "contains with a dialect Compare hook but no Contains hook")
 		}
-		return eval && contains(a, b, at), a, false
+		return eval && contains(a, b, at)
 	}
 	if c, ok := a.x.(Comparer); eval && ok && a.lit == 0 {
-		return valueCompare(c, op, b, at), a, false
+		return valueCompare(c, op, b, at)
 	}
 	if c, ok := b.x.(Comparer); eval && ok && b.lit == 0 {
-		return valueCompare(c, mirror[op], a, at), a, false
+		return valueCompare(c, mirror[op], a, at)
 	}
 	if eval && r.dialect != nil && r.dialect.Compare != nil {
-		return r.dialectCompare(op, a, b, at), a, false
+		return r.dialectCompare(op, a, b, at)
 	}
-	return eval && compare(op, a, b, at), a, false
+	return eval && compare(op, a, b, at)
 }
 
+// op reads an operator, as liquidjs's readOperator does: a word operator needs a
+// non-word character after it.
 func (r *renderer) op() string {
 	rest := r.src[r.p:]
-	for _, op := range [...]string{"==", "!=", "<=", ">=", "<", ">", "contains"} {
-		if strings.HasPrefix(rest, op) {
-			if op == "contains" && len(rest) > len(op) && isIdentChar(rest[len(op)]) {
-				bail(r.pos(), "contains-glued", "contains followed by an identifier character") // liquidjs splits containsx into contains x
-			}
-			r.p += len(op)
-			return op
-		}
+	if rest == "" {
+		return ""
 	}
-	return ""
+	var op string
+	switch rest[0] {
+	case '=':
+		op = "=="
+	case '!':
+		op = "!="
+	case '<':
+		op = "<"
+		if len(rest) > 1 && rest[1] == '=' {
+			op = "<="
+		}
+	case '>':
+		op = ">"
+		if len(rest) > 1 && rest[1] == '=' {
+			op = ">="
+		}
+	case 'c':
+		op = "contains"
+	case 'a':
+		op = "and"
+	case 'o':
+		op = "or"
+	case 'n':
+		op = "not"
+	default:
+		return ""
+	}
+	if !strings.HasPrefix(rest, op) {
+		return ""
+	}
+	if c := op[0]; c >= 'a' && c <= 'z' && (len(rest) > len(op) && isIdentChar(rest[len(op)]) || wordRune(rest, len(op)) > 0) {
+		return "" // a word: containsx is an operand
+	}
+	r.p += len(op)
+	return op
 }
 
 // expr = path | string | number | range | "true" | "false" | "nil" | "null" | "blank" | "empty"
@@ -270,26 +587,26 @@ func (r *renderer) expr(eval, lenient bool) val {
 
 func (r *renderer) str() string {
 	at := r.pos()
-	end := quotedEnd(r.src, r.p)
+	end := quotedEnd(r.src, r.p, r.rawStrings())
 	if end < 0 {
 		bail(at, "unterminated-string", "unterminated string")
 	}
 	s := r.src[r.p+1 : end-1]
 	r.p = end
-	if strings.IndexByte(s, '\\') < 0 {
+	if r.rawStrings() || strings.IndexByte(s, '\\') < 0 {
 		return s
 	}
 	return unescape(s, at)
 }
 
 // quotedEnd returns the index just past the quote closing the string at s[i], skipping
-// backslash escapes as liquidjs's readQuoted does, or -1.
-func quotedEnd(s string, i int) int {
+// backslash escapes as liquidjs's readQuoted does unless raw, or -1.
+func quotedEnd(s string, i int, raw bool) int {
 	k := strings.IndexByte(s[i+1:], s[i])
 	if k < 0 {
 		return -1
 	}
-	if strings.IndexByte(s[i+1:i+1+k], '\\') < 0 {
+	if raw || strings.IndexByte(s[i+1:i+1+k], '\\') < 0 {
 		return i + k + 2
 	}
 	for j := i + 1; j < len(s); j++ {
@@ -382,6 +699,8 @@ func (r *renderer) blankAt(i int) bool {
 // path = ident { "." ws word | "[" ws expr ws "]" }
 func (r *renderer) path(eval, lenient bool) any {
 	start := r.p
+	earlier := r.afterUndef // an earlier operand's undefined
+	r.afterUndef = false
 	name := r.ident()
 	var kb [8]val // the keys so far, for ErrUndefined's Path
 	keys := kb[:0]
@@ -436,7 +755,7 @@ func (r *renderer) path(eval, lenient bool) any {
 				r.read(name, seg, seg == "size")
 			}
 			if eval {
-				v = segment(v, val{s: seg, lit: litStr}, at, ruby, falsyRoot, depth)
+				v = segment(v, val{s: seg, lit: litStr}, at, ruby, falsyRoot, depth, true)
 			}
 			depth++
 			if track {
@@ -446,11 +765,15 @@ func (r *renderer) path(eval, lenient bool) any {
 			r.p++
 			r.ws()
 			at := r.pos()
-			k := r.expr(eval, false)
+			// Ruby's conditions read an undefined index as nil, even under strict.
+			k := r.expr(eval, ruby && lenient && len(r.binds) == 0)
 			if k.keyword() != "" {
 				bail(at, "keyword-index", "%s as an index", k.keyword())
 			}
 			if eval && r.strict && isUndef(k) {
+				if earlier {
+					bail(at, "strict-loose-default", "an undefined index after an earlier undefined operand, under strict") // which liquidjs throws depends on a leading default
+				}
 				// liquidjs evaluates index keys strictly, even where the path itself is lenient.
 				e := &Error{Kind: ErrUndefined, Code: "undefined", Pos: at, Msg: r.src[at-r.base : r.p]}
 				if r.undef.set && r.undef.pos == at {
@@ -466,7 +789,7 @@ func (r *renderer) path(eval, lenient bool) any {
 				r.read(name, k.s, k.lit != litStr || k.s == "size")
 			}
 			if eval {
-				v = segment(v, k, at, ruby, falsyRoot, depth)
+				v = segment(v, k, at, ruby, falsyRoot, depth, false)
 			}
 			depth++
 			if track {
@@ -486,33 +809,67 @@ func (r *renderer) path(eval, lenient bool) any {
 }
 
 // segment is the value of a path's next segment: key's, or with ruby (Dialect.RubyLookups)
-// Ruby Liquid's, where a nil or false first segment is the whole lookup's value and past
-// it a property or index of nil or false is undefined. An Integer index of a Hash, or a
-// non-negative one past an Array's end, is nil: Ruby fetches it without raising.
-func segment(v any, k val, at int, ruby, falsyRoot bool, depth int) any {
+// Ruby Liquid's, where a nil or false first segment is the whole lookup's value, past it a
+// property or index of nil or false is undefined, a bracket index is rubyIndex's and a
+// property rubyProp's.
+func segment(v any, k val, at int, ruby, falsyRoot bool, depth int, dot bool) any {
 	switch {
 	case falsyRoot:
 		return v
 	case ruby && depth > 0 && (v == nil || v == false):
 		return Undefined{}
+	case ruby && !dot:
+		return rubyIndex(v, k, at)
 	}
-	if ruby {
-		if n, ok := rubyInt(k); ok {
-			switch v.(type) {
-			case map[string]any:
-				return nil
-			case []any:
-				if x := key(v, k, at); x != (Undefined{}) || n < 0 {
-					return x
-				}
-				return nil
-			}
+	if s, ok := k.str(); ruby && ok {
+		if x, ok := rubyProp(v, s, at); ok {
+			return x
 		}
 	}
 	return key(v, k, at)
 }
 
-// rubyInt is k as a Ruby Integer index: an integer literal or data value.
+// rubyIndex is v[k] as Ruby Liquid's Context#variable reads it: a Hash by a String key it
+// has, an Array by an Integer, and an Integer miss on either is nil, as fetch returns it.
+// Every other index of a Hash, Array, String, Integer or true is undefined.
+func rubyIndex(v any, k val, at int) any {
+	n, isInt := rubyInt(k)
+	s, isStr := k.str()
+	switch k.x.(type) {
+	case nil, Undefined, nilLitT, bool, string, json.Number, int, int64, float64, map[string]any, []any:
+	default:
+		return key(v, k, at)
+	}
+	switch m := v.(type) {
+	case Undefined:
+		return v
+	case map[string]any:
+		if x, ok := m[s]; ok && isStr {
+			return x
+		}
+		if isInt {
+			return nil
+		}
+	case []any:
+		switch {
+		case !isInt:
+		case n >= float64(len(m)):
+			return nil
+		case n >= 0:
+			return m[int(n)]
+		case n >= -float64(len(m)):
+			return m[len(m)+int(n)]
+		}
+	case string, bool, int, int64:
+	default:
+		if _, ok := rubyInt(val{x: v}); !ok {
+			return key(v, k, at) // a Float or other value Ruby may index differently
+		}
+	}
+	return Undefined{}
+}
+
+// rubyInt is k as a Ruby Integer index: an integer literal or value.
 func rubyInt(k val) (float64, bool) {
 	text := k.s
 	switch {
@@ -527,6 +884,8 @@ func rubyInt(k val) (float64, bool) {
 			return float64(x), true
 		case int64:
 			return float64(x), true
+		case float64: // mist's loop indexes and sizes
+			return x, x == math.Trunc(x) && math.Abs(x) < maxSafeInt
 		case json.Number:
 			text = string(x)
 		default:
@@ -538,6 +897,45 @@ func rubyInt(k val) (float64, bool) {
 	}
 	n, err := strconv.ParseFloat(text, 64)
 	return n, err == nil
+}
+
+// rubyProp is Ruby Liquid's property s of v, where it differs from liquidjs's: strings
+// have size, first and last too (in characters), a Hash's first is its first pair, and
+// an Array has no other properties.
+func rubyProp(v any, s string, at int) (any, bool) {
+	switch m := v.(type) {
+	case string:
+		if !magic(s) {
+			return nil, false
+		}
+		if !utf8.ValidString(m) {
+			bail(at, "invalid-utf8", "%s of invalid UTF-8", s)
+		}
+		switch s {
+		case "size":
+			return boxInt(utf8.RuneCountInString(m)), true
+		case "first":
+			_, n := utf8.DecodeRuneInString(m)
+			return m[:n], true
+		}
+		_, n := utf8.DecodeLastRuneInString(m)
+		return m[len(m)-n:], true
+	case map[string]any:
+		if _, ok := m[s]; ok || !magic(s) {
+			return nil, false
+		}
+		if s == "first" {
+			bail(at, "dialect-ruby-hash-first", "first of a Hash, which Ruby reads as its first pair")
+		}
+		if s == "last" {
+			return Undefined{}, true
+		}
+	case []any:
+		if !magic(s) {
+			return Undefined{}, true
+		}
+	}
+	return nil, false
 }
 
 // read records, for Engine.Reads, that the template reads key of the variable name, or
@@ -599,12 +997,9 @@ func (r *renderer) expValue(eval bool, exp, name string, item any, at int) val {
 	r.exps++
 	r.src, r.base, r.p, r.undef, r.lenientUndef = exp, at, 0, pendingUndef{}, false
 	r.binds = append(r.binds, binding{name, item})
-	res, v, lone := r.cond(eval)
-	if k := v.keyword(); lone && k != "" {
+	v, _, _ := r.value(eval, true, true)
+	if k := v.keyword(); k != "" {
 		bail(at, "keyword-outside-equality", "%s is only supported in conditions and output", k)
-	}
-	if !lone {
-		v = val{x: res}
 	}
 	lenient := false
 	if r.peek() == '|' {
