@@ -403,16 +403,16 @@ func TestDialectRubyForElse(t *testing.T) {
 	data := map[string]any{"xs": []any{1, 2, 3}, "em": []any{}, "n": nil, "i": 3, "z": 0}
 	loop := func(head string) string { return "{% for x in " + head + " %}{{ x }}{% else %}E{% endfor %}" }
 	for tpl, want := range map[string]string{
-		loop("xs offset: 3"):                                   "E",
-		loop("xs limit: 0"):                                    "E",
-		loop("xs reversed offset: 3"):                          "E",
-		loop("xs offset: 1 limit: 1"):                          "2",
-		loop("(1..3) offset: 3"):                               "E",
-		loop("(i..z) limit: 1"):                                "E",
-		loop("em limit: 2"):                                    "E",
-		loop("n offset: 1"):                                    "E",
-		loop("missing"):                                        "E",
-		"{% if false %}" + loop("xs limit: 0") + "{% endif %}": "",
+		loop("xs offset: 3"):          "E",
+		loop("xs limit: 0"):           "E",
+		loop("xs reversed offset: 3"): "E",
+		loop("xs offset: 1 limit: 1"): "2",
+		loop("(1..3) offset: 3"):      "E",
+		loop("(i..z) limit: 1"):       "E",
+		loop("em limit: 2"):           "E",
+		loop("n offset: 1"):           "E",
+		loop("missing"):               "E",
+		"{% if false %}" + loop("xs limit: 0") + "{% endif %}":                                                                             "",
 		"{% for x in xs limit: 1 %}{% for y in em %}{% else %}I{% endfor %}{% endfor %}{% for x in xs offset: 9 %}{% else %}E{% endfor %}": "IE",
 	} {
 		if out, err := e.Render(tpl, data, false); err != nil || out != want {
