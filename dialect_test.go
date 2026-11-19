@@ -393,3 +393,23 @@ func TestDialectRubyLax(t *testing.T) {
 		}
 	}
 }
+
+// Outputs are render's legacy (Ruby Liquid 2.5 emulation) engine's.
+func TestDialectRawStrings(t *testing.T) {
+	e := Engine{Dialect: &Dialect{RawStrings: true, RubyLax: true}}
+	data := map[string]any{"s": `a\b`}
+	for tpl, want := range map[string]string{
+		`{{ "a\nb" }}`:                                          `a\nb`,
+		`{{ "c:\temp" | append: "\x" }}`:                        `c:\temp\x`,
+		`{% assign x = "\u00e9" %}{{ x }}`:                      `\u00e9`,
+		`{{ "\101" }}|{{ "\\" }}|{{ "\'" }}`:                    `\101|\\|\'`,
+		`{{ "a\" | append: "b" }}|{{ "a\" }}{{ "b" }}`:          `a\b|a\b`,
+		`{% if s == "a\b" %}Y{% else %}N{% endif %}`:            "Y",
+		`{% case s %}{% when "a\b" %}W{% else %}E{% endcase %}`: "W",
+		`{{ s | replace: "\", "/" }}`:                           "a/b",
+	} {
+		if out, err := e.Render(tpl, data, false); err != nil || out != want {
+			t.Errorf("%s: got %q, %v; want %q", tpl, out, err, want)
+		}
+	}
+}

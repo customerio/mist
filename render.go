@@ -211,7 +211,7 @@ func (r *renderer) run() {
 			r.checkOutput(start)
 			break
 		}
-		b, e, next, lt, rt := delimBounds(s, start, isTag)
+		b, e, next, lt, rt := r.delimBounds(s, start, isTag)
 		if (lt || rt) && r.rejects(TrimMarkers) {
 			bail(start, "dialect-trim-markers", "trim markers are rejected by the dialect")
 		}
@@ -266,7 +266,7 @@ func nextDelim(s string, pos int) (int, bool) {
 
 // delimBounds returns the body [b,e) of the tag or output at start, excluding
 // trim markers, and the offset just past its closer.
-func delimBounds(s string, start int, isTag bool) (b, e, next int, lt, rt bool) {
+func (r *renderer) delimBounds(s string, start int, isTag bool) (b, e, next int, lt, rt bool) {
 	b = start + 2
 	if b < len(s) && s[b] == '-' {
 		lt = true
@@ -280,7 +280,7 @@ func delimBounds(s string, start int, isTag bool) (b, e, next int, lt, rt bool) 
 		}
 		e = b + k
 	} else {
-		e = closeOutput(s, b, start)
+		e = closeOutput(s, b, start, r.rawStrings())
 	}
 	next = e + 2
 	if e > b && s[e-1] == '-' {
@@ -291,11 +291,11 @@ func delimBounds(s string, start int, isTag bool) (b, e, next int, lt, rt bool) 
 }
 
 // closeOutput finds the "}}" closing an output, skipping quoted strings as liquidjs does.
-func closeOutput(s string, i, start int) int {
+func closeOutput(s string, i, start int, raw bool) int {
 	for i < len(s) {
 		switch c := s[i]; c {
 		case '"', '\'':
-			if i = quotedEnd(s, i); i < 0 {
+			if i = quotedEnd(s, i, raw); i < 0 {
 				bail(start, "unterminated-string", "unterminated string")
 			}
 		case '}':
@@ -807,7 +807,7 @@ func (r *renderer) skipComment(pos int) (int, bool) {
 		if start == len(s) {
 			bail(pos, "unclosed-comment", "unclosed comment")
 		}
-		b, e, next, lt, rt := delimBounds(s, start, isTag)
+		b, e, next, lt, rt := r.delimBounds(s, start, isTag)
 		if (lt || rt) && r.rejects(TrimMarkers) {
 			bail(start, "dialect-trim-markers", "trim markers are rejected by the dialect")
 		}

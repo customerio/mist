@@ -251,6 +251,8 @@ func (r *renderer) operands(eval, lenient, inCond bool, start, end int, first *o
 
 func (r *renderer) rubyLax() bool { return r.dialect != nil && r.dialect.RubyLax }
 
+func (r *renderer) rawStrings() bool { return r.dialect != nil && r.dialect.RawStrings }
+
 // rubyCond is a condition as Ruby's If reads it: segments `operand [op [operand]]`
 // joined by and/or, grouped right to left; text after a segment's operands is ignored.
 func (r *renderer) rubyCond(eval bool) bool {
@@ -585,26 +587,26 @@ func (r *renderer) expr(eval, lenient bool) val {
 
 func (r *renderer) str() string {
 	at := r.pos()
-	end := quotedEnd(r.src, r.p)
+	end := quotedEnd(r.src, r.p, r.rawStrings())
 	if end < 0 {
 		bail(at, "unterminated-string", "unterminated string")
 	}
 	s := r.src[r.p+1 : end-1]
 	r.p = end
-	if strings.IndexByte(s, '\\') < 0 {
+	if r.rawStrings() || strings.IndexByte(s, '\\') < 0 {
 		return s
 	}
 	return unescape(s, at)
 }
 
 // quotedEnd returns the index just past the quote closing the string at s[i], skipping
-// backslash escapes as liquidjs's readQuoted does, or -1.
-func quotedEnd(s string, i int) int {
+// backslash escapes as liquidjs's readQuoted does unless raw, or -1.
+func quotedEnd(s string, i int, raw bool) int {
 	k := strings.IndexByte(s[i+1:], s[i])
 	if k < 0 {
 		return -1
 	}
-	if strings.IndexByte(s[i+1:i+1+k], '\\') < 0 {
+	if raw || strings.IndexByte(s[i+1:i+1+k], '\\') < 0 {
 		return i + k + 2
 	}
 	for j := i + 1; j < len(s); j++ {
