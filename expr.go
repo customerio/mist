@@ -765,7 +765,8 @@ func (r *renderer) path(eval, lenient bool) any {
 			r.p++
 			r.ws()
 			at := r.pos()
-			k := r.expr(eval, false)
+			// Ruby's conditions read an undefined index as nil, even under strict.
+			k := r.expr(eval, ruby && lenient && len(r.binds) == 0)
 			if k.keyword() != "" {
 				bail(at, "keyword-index", "%s as an index", k.keyword())
 			}
@@ -808,39 +809,67 @@ func (r *renderer) path(eval, lenient bool) any {
 }
 
 // segment is the value of a path's next segment: key's, or with ruby (Dialect.RubyLookups)
-// Ruby Liquid's, where a nil or false first segment is the whole lookup's value and past
-// it a property or index of nil or false is undefined. dot is a property, not an index.
-// An Integer index of a Hash, or a non-negative one past an Array's end, is nil: Ruby
-// fetches it without raising.
+// Ruby Liquid's, where a nil or false first segment is the whole lookup's value, past it a
+// property or index of nil or false is undefined, a bracket index is rubyIndex's and a
+// property rubyProp's.
 func segment(v any, k val, at int, ruby, falsyRoot bool, depth int, dot bool) any {
 	switch {
 	case falsyRoot:
 		return v
 	case ruby && depth > 0 && (v == nil || v == false):
 		return Undefined{}
+	case ruby && !dot:
+		return rubyIndex(v, k, at)
 	}
 	if s, ok := k.str(); ruby && ok {
-		if x, ok := rubyProp(v, s, dot, at); ok {
+		if x, ok := rubyProp(v, s, at); ok {
 			return x
-		}
-	}
-	if ruby {
-		if n, ok := rubyInt(k); ok {
-			switch v.(type) {
-			case map[string]any:
-				return nil
-			case []any:
-				if x := key(v, k, at); x != (Undefined{}) || n < 0 {
-					return x
-				}
-				return nil
-			}
 		}
 	}
 	return key(v, k, at)
 }
 
-// rubyInt is k as a Ruby Integer index: an integer literal or data value.
+// rubyIndex is v[k] as Ruby Liquid's Context#variable reads it: a Hash by a String key it
+// has, an Array by an Integer, and an Integer miss on either is nil, as fetch returns it.
+// Every other index of a Hash, Array, String, Integer or true is undefined.
+func rubyIndex(v any, k val, at int) any {
+	n, isInt := rubyInt(k)
+	s, isStr := k.str()
+	switch k.x.(type) {
+	case nil, Undefined, nilLitT, bool, string, json.Number, int, int64, float64, map[string]any, []any:
+	default:
+		return key(v, k, at)
+	}
+	switch m := v.(type) {
+	case Undefined:
+		return v
+	case map[string]any:
+		if x, ok := m[s]; ok && isStr {
+			return x
+		}
+		if isInt {
+			return nil
+		}
+	case []any:
+		switch {
+		case !isInt:
+		case n >= float64(len(m)):
+			return nil
+		case n >= 0:
+			return m[int(n)]
+		case n >= -float64(len(m)):
+			return m[len(m)+int(n)]
+		}
+	case string, bool, int, int64:
+	default:
+		if _, ok := rubyInt(val{x: v}); !ok {
+			return key(v, k, at) // a Float or other value Ruby may index differently
+		}
+	}
+	return Undefined{}
+}
+
+// rubyInt is k as a Ruby Integer index: an integer literal or value.
 func rubyInt(k val) (float64, bool) {
 	text := k.s
 	switch {
@@ -855,6 +884,8 @@ func rubyInt(k val) (float64, bool) {
 			return float64(x), true
 		case int64:
 			return float64(x), true
+		case float64: // mist's loop indexes and sizes
+			return x, x == math.Trunc(x) && math.Abs(x) < maxSafeInt
 		case json.Number:
 			text = string(x)
 		default:
@@ -868,15 +899,12 @@ func rubyInt(k val) (float64, bool) {
 	return n, err == nil
 }
 
-// rubyProp is Ruby Liquid's lookup of a string key, where it differs from liquidjs's:
-// only a property computes size, first and last, which strings have too (in
-// characters), a Hash's first is its first pair, and an Array has no string keys.
-func rubyProp(v any, s string, dot bool, at int) (any, bool) {
+// rubyProp is Ruby Liquid's property s of v, where it differs from liquidjs's: strings
+// have size, first and last too (in characters), a Hash's first is its first pair, and
+// an Array has no other properties.
+func rubyProp(v any, s string, at int) (any, bool) {
 	switch m := v.(type) {
 	case string:
-		if !dot {
-			return Undefined{}, true
-		}
 		if !magic(s) {
 			return nil, false
 		}
@@ -896,14 +924,14 @@ func rubyProp(v any, s string, dot bool, at int) (any, bool) {
 		if _, ok := m[s]; ok || !magic(s) {
 			return nil, false
 		}
-		if dot && s == "first" {
+		if s == "first" {
 			bail(at, "dialect-ruby-hash-first", "first of a Hash, which Ruby reads as its first pair")
 		}
-		if !dot || s == "last" {
+		if s == "last" {
 			return Undefined{}, true
 		}
 	case []any:
-		if !dot || !magic(s) {
+		if !magic(s) {
 			return Undefined{}, true
 		}
 	}

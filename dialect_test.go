@@ -262,6 +262,24 @@ func TestDialectRubyLookups(t *testing.T) {
 		{"[{{ s[k] }}]", map[string]any{"s": "ab", "k": "size"}, "undefined"},
 		{"[{{ s.x }}]", map[string]any{"s": "ab"}, "undefined"},
 		{"[{{ h['k'] }}]", map[string]any{"h": map[string]any{"k": 1}}, "[1]"},
+		{"[{{ c[i] }}]", map[string]any{"c": []any{1, 2}, "i": "1"}, "undefined"},
+		{"[{{ c['size'] }}]", map[string]any{"c": []any{1}}, "undefined"},
+		{"[{{ c['size'] }}]", map[string]any{"c": map[string]any{}}, "undefined"},
+		{"[{{ c['size'] }}]", map[string]any{"c": map[string]any{"size": "s"}}, "[s]"},
+		{"[{{ c['size'] }}]", map[string]any{"c": "abc"}, "undefined"},
+		{"[{{ c[0] }}]", map[string]any{"c": "abc"}, "undefined"},
+		{"[{{ c[0] }}]", map[string]any{"c": int64(5)}, "undefined"},
+		{"[{{ c[0] }}]", map[string]any{"c": true}, "undefined"},
+		{"[{{ c[i] }}]", map[string]any{"c": []any{1}, "i": json.Number("1.5")}, "undefined"},
+		{"[{{ c[i] }}]", map[string]any{"c": map[string]any{"1.5": 1}, "i": json.Number("1.5")}, "undefined"},
+		{"[{{ c[i] }}]", map[string]any{"c": map[string]any{"true": 1}, "i": true}, "undefined"},
+		{"[{{ c[i] }}]", map[string]any{"c": []any{1}, "i": nil}, "undefined"},
+		{"[{{ c[i] }}]", map[string]any{"c": map[string]any{"": 1}, "i": []any{}}, "undefined"},
+		{"[{{ c[(1..2)] }}]", map[string]any{"c": []any{1, 2, 3}}, "undefined"},
+		{"{% for x in c %}{{ c[forloop.index0] }}{% endfor %}", map[string]any{"c": []any{1, 2}}, "12"},
+		{"{% if c[m] %}y{% else %}n{% endif %}", map[string]any{"c": []any{1}}, "n"},
+		{"{% if c[m.x] == nil %}y{% endif %}", map[string]any{"c": map[string]any{}}, "y"},
+		{"[{{ c[m] }}]", map[string]any{"c": []any{1}}, "undefined"},
 	} {
 		out, err := e.Render(c.tpl, c.vars, true)
 		if errors.Is(err, ErrUndefined) {
@@ -284,9 +302,24 @@ func TestDialectRubyLookups(t *testing.T) {
 	if out, err := (Engine{}).Render("[{{ c.p.x }}]", map[string]any{"c": map[string]any{"p": nil}}, true); err != nil || out != "[]" {
 		t.Errorf("liquidjs: got %q, %v; want [], a property of null being null", out, err)
 	}
+	if out, err := e.Render("[{{ c[m] }}]", map[string]any{"c": []any{1}}, false); err != nil || out != "[]" {
+		t.Errorf("lax undefined index: got %q, %v; want []", out, err)
+	}
+	if out, err := e.Render("[{{ m[0] }}]", nil, false); err != nil || out != "[]" {
+		t.Errorf("lax index of undefined: got %q, %v; want []", out, err)
+	}
+	if _, err := e.Render("[{{ c[i] }}]", map[string]any{"c": []any{1}, "i": struct{}{}}, false); !errors.Is(err, ErrUnsupported) {
+		t.Errorf("index of an unknown type: got %v; want ErrUnsupported", err)
+	}
+	if _, err := e.Render("[{{ c[0] }}]", map[string]any{"c": json.Number("1.5")}, false); !errors.Is(err, ErrUnsupported) {
+		t.Errorf("index of a Float: got %v; want ErrUnsupported", err)
+	}
 	e.Dialect.NumberText = true
 	if _, err := e.Render("[{{ c[1.0] }}]", map[string]any{"c": map[string]any{}}, true); !errors.Is(err, ErrUndefined) {
 		t.Errorf("Float index: got %v; want ErrUndefined", err)
+	}
+	if _, err := e.Render("[{{ c[1.0] }}]", map[string]any{"c": []any{1, 2}}, true); !errors.Is(err, ErrUndefined) {
+		t.Errorf("Float index of an Array: got %v; want ErrUndefined", err)
 	}
 }
 

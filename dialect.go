@@ -44,9 +44,10 @@ type Dialect struct {
 
 	// RubyLookups looks variables up as Ruby Liquid's Context#variable does: when the
 	// first segment is nil or false the whole lookup is that value, and past it a
-	// property or index of nil or false is undefined (ErrUndefined under strict). Only
-	// a property computes size, first and last, strings' in characters; a string index
-	// of an Array is undefined, and a Hash's computed first (its first pair) bails.
+	// property or index of nil or false is undefined (ErrUndefined under strict). A
+	// bracket index reads a Hash by a String key and an Array by an Integer, and an
+	// undefined index in a condition is nil. Only a property computes size, first and
+	// last, strings' in characters, and a Hash's computed first (its first pair) bails.
 	RubyLookups bool
 
 	// RubyLax reads conditions, outputs and assigns as Ruby Liquid 2.5's lax parser
