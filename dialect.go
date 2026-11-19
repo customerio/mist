@@ -54,6 +54,10 @@ type Dialect struct {
 	// filters from the first `|`. An operator Ruby doesn't know (Ruby's "Unknown
 	// operator" error), and anything mist can't split exactly as Ruby does, bails.
 	RubyLax bool
+
+	// RawStrings reads string literals as Ruby Liquid's QuotedString does: a string
+	// ends at the first matching quote and keeps its backslashes.
+	RawStrings bool
 }
 
 // Constructs is a set of template constructs a Dialect can reject.
