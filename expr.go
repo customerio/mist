@@ -1,6 +1,7 @@
 package mist
 
 import (
+	"encoding/json"
 	"math"
 	"slices"
 	"strconv"
@@ -486,7 +487,8 @@ func (r *renderer) path(eval, lenient bool) any {
 
 // segment is the value of a path's next segment: key's, or with ruby (Dialect.RubyLookups)
 // Ruby Liquid's, where a nil or false first segment is the whole lookup's value and past
-// it a property or index of nil or false is undefined.
+// it a property or index of nil or false is undefined. An Integer index of a Hash, or a
+// non-negative one past an Array's end, is nil: Ruby fetches it without raising.
 func segment(v any, k val, at int, ruby, falsyRoot bool, depth int) any {
 	switch {
 	case falsyRoot:
@@ -494,7 +496,48 @@ func segment(v any, k val, at int, ruby, falsyRoot bool, depth int) any {
 	case ruby && depth > 0 && (v == nil || v == false):
 		return Undefined{}
 	}
+	if ruby {
+		if n, ok := rubyInt(k); ok {
+			switch v.(type) {
+			case map[string]any:
+				return nil
+			case []any:
+				if x := key(v, k, at); x != (Undefined{}) || n < 0 {
+					return x
+				}
+				return nil
+			}
+		}
+	}
 	return key(v, k, at)
+}
+
+// rubyInt is k as a Ruby Integer index: an integer literal or data value.
+func rubyInt(k val) (float64, bool) {
+	text := k.s
+	switch {
+	case k.lit == litNum && text == "":
+		return k.n, k.n == math.Trunc(k.n)
+	case k.lit == litNum:
+	case k.lit != 0:
+		return 0, false
+	default:
+		switch x := k.x.(type) {
+		case int:
+			return float64(x), true
+		case int64:
+			return float64(x), true
+		case json.Number:
+			text = string(x)
+		default:
+			return 0, false
+		}
+	}
+	if strings.ContainsAny(text, ".eE") {
+		return 0, false
+	}
+	n, err := strconv.ParseFloat(text, 64)
+	return n, err == nil
 }
 
 // read records, for Engine.Reads, that the template reads key of the variable name, or
