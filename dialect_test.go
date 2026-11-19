@@ -269,6 +269,19 @@ func TestDialectRubyLookups(t *testing.T) {
 		{"[{{ c.p.x }}]", map[string]any{"c": map[string]any{"p": false}}, "undefined"},
 		{"[{{ c.p }}]", map[string]any{"c": map[string]any{"p": nil}}, "[]"},
 		{"{% if c.p.x %}y{% else %}n{% endif %}", map[string]any{"c": map[string]any{"p": nil}}, "n"},
+		{"[{{ c[0] }}]", map[string]any{"c": []any{}}, "[]"},
+		{"[{{ c[3] }}]", map[string]any{"c": []any{1}}, "[]"},
+		{"[{{ c[0] }}]", map[string]any{"c": []any{1}}, "[1]"},
+		{"[{{ c[i] }}]", map[string]any{"c": []any{}, "i": json.Number("2")}, "[]"},
+		{"[{{ c[i] }}]", map[string]any{"c": []any{1}, "i": int64(-1)}, "[1]"},
+		{"[{{ c[i] }}]", map[string]any{"c": []any{1}, "i": int64(-2)}, "undefined"},
+		{"[{{ c[i] }}]", map[string]any{"c": []any{}, "i": json.Number("0.0")}, "undefined"},
+		{"[{{ c[0].x }}]", map[string]any{"c": []any{}}, "undefined"},
+		{"[{{ c[0] }}]", map[string]any{"c": map[string]any{"0": "z"}}, "[]"},
+		{"[{{ c[i] }}]", map[string]any{"c": map[string]any{}, "i": 1}, "[]"},
+		{"[{{ c['0'] }}]", map[string]any{"c": map[string]any{"0": "z"}}, "[z]"},
+		{"[{{ c[1.5] }}]", map[string]any{"c": map[string]any{}}, "undefined"},
+		{"[{{ c[i] }}]", map[string]any{"c": map[string]any{"0": "z"}, "i": "0"}, "[z]"},
 	} {
 		out, err := e.Render(c.tpl, c.vars, true)
 		if errors.Is(err, ErrUndefined) {
@@ -283,6 +296,10 @@ func TestDialectRubyLookups(t *testing.T) {
 	}
 	if out, err := (Engine{}).Render("[{{ c.p.x }}]", map[string]any{"c": map[string]any{"p": nil}}, true); err != nil || out != "[]" {
 		t.Errorf("liquidjs: got %q, %v; want [], a property of null being null", out, err)
+	}
+	e.Dialect.NumberText = true
+	if _, err := e.Render("[{{ c[1.0] }}]", map[string]any{"c": map[string]any{}}, true); !errors.Is(err, ErrUndefined) {
+		t.Errorf("Float index: got %v; want ErrUndefined", err)
 	}
 }
 
