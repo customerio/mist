@@ -249,6 +249,19 @@ func TestDialectRubyLookups(t *testing.T) {
 		{"[{{ c['0'] }}]", map[string]any{"c": map[string]any{"0": "z"}}, "[z]"},
 		{"[{{ c[1.5] }}]", map[string]any{"c": map[string]any{}}, "undefined"},
 		{"[{{ c[i] }}]", map[string]any{"c": map[string]any{"0": "z"}, "i": "0"}, "[z]"},
+		// strings' size, first and last count characters, as render's legacy engine does
+		{"[{{ s.first }}{{ s.last }}{{ s.size }}][{{ e.first }}{{ e.last }}{{ e.size }}][{{ s.first.last }}]", map[string]any{"s": "é😀x", "e": ""}, "[éx3][0][é]"},
+		{"{% if e.first == '' %}y{% endif %}", map[string]any{"e": ""}, "y"},
+		{"[{{ h.size }}{{ h.first }}{{ xs.first }}{{ xs.last }}{{ xs.size }}]", map[string]any{"h": map[string]any{"first": "F", "k": 1}, "xs": []any{1, 2}}, "[2F122]"},
+		// only a property computes them, and an Array has no string keys
+		{"[{{ xs['first'] }}]", map[string]any{"xs": []any{1}}, "undefined"},
+		{"[{{ xs['0'] }}]", map[string]any{"xs": []any{1}}, "undefined"},
+		{"[{{ xs.n }}]", map[string]any{"xs": []any{1}}, "undefined"},
+		{"[{{ h['size'] }}]", map[string]any{"h": map[string]any{}}, "undefined"},
+		{"[{{ h.last }}]", map[string]any{"h": map[string]any{"k": 1}}, "undefined"},
+		{"[{{ s[k] }}]", map[string]any{"s": "ab", "k": "size"}, "undefined"},
+		{"[{{ s.x }}]", map[string]any{"s": "ab"}, "undefined"},
+		{"[{{ h['k'] }}]", map[string]any{"h": map[string]any{"k": 1}}, "[1]"},
 	} {
 		out, err := e.Render(c.tpl, c.vars, true)
 		if errors.Is(err, ErrUndefined) {
@@ -257,6 +270,13 @@ func TestDialectRubyLookups(t *testing.T) {
 		if out != c.want {
 			t.Errorf("%s with %v: got %q, %v; want %q", c.tpl, c.vars, out, err, c.want)
 		}
+	}
+	var me *Error
+	if _, err := e.Render("{{ h.first }}", map[string]any{"h": map[string]any{"k": 1}}, false); !errors.As(err, &me) || me.Code != "dialect-ruby-hash-first" {
+		t.Errorf("Hash first: got %v; want dialect-ruby-hash-first", err)
+	}
+	if _, err := e.Render("{{ s.size }}", map[string]any{"s": "a\xff"}, false); !errors.As(err, &me) || me.Code != "invalid-utf8" {
+		t.Errorf("invalid UTF-8: got %v; want invalid-utf8", err)
 	}
 	if out, err := e.Render("[{{ c.p.x }}]", map[string]any{"c": map[string]any{"p": nil}}, false); err != nil || out != "[]" {
 		t.Errorf("lax: got %q, %v; want []", out, err)

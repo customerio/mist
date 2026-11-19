@@ -755,7 +755,7 @@ func (r *renderer) path(eval, lenient bool) any {
 				r.read(name, seg, seg == "size")
 			}
 			if eval {
-				v = segment(v, val{s: seg, lit: litStr}, at, ruby, falsyRoot, depth)
+				v = segment(v, val{s: seg, lit: litStr}, at, ruby, falsyRoot, depth, true)
 			}
 			depth++
 			if track {
@@ -788,7 +788,7 @@ func (r *renderer) path(eval, lenient bool) any {
 				r.read(name, k.s, k.lit != litStr || k.s == "size")
 			}
 			if eval {
-				v = segment(v, k, at, ruby, falsyRoot, depth)
+				v = segment(v, k, at, ruby, falsyRoot, depth, false)
 			}
 			depth++
 			if track {
@@ -809,14 +809,20 @@ func (r *renderer) path(eval, lenient bool) any {
 
 // segment is the value of a path's next segment: key's, or with ruby (Dialect.RubyLookups)
 // Ruby Liquid's, where a nil or false first segment is the whole lookup's value and past
-// it a property or index of nil or false is undefined. An Integer index of a Hash, or a
-// non-negative one past an Array's end, is nil: Ruby fetches it without raising.
-func segment(v any, k val, at int, ruby, falsyRoot bool, depth int) any {
+// it a property or index of nil or false is undefined. dot is a property, not an index.
+// An Integer index of a Hash, or a non-negative one past an Array's end, is nil: Ruby
+// fetches it without raising.
+func segment(v any, k val, at int, ruby, falsyRoot bool, depth int, dot bool) any {
 	switch {
 	case falsyRoot:
 		return v
 	case ruby && depth > 0 && (v == nil || v == false):
 		return Undefined{}
+	}
+	if s, ok := k.str(); ruby && ok {
+		if x, ok := rubyProp(v, s, dot, at); ok {
+			return x
+		}
 	}
 	if ruby {
 		if n, ok := rubyInt(k); ok {
@@ -860,6 +866,48 @@ func rubyInt(k val) (float64, bool) {
 	}
 	n, err := strconv.ParseFloat(text, 64)
 	return n, err == nil
+}
+
+// rubyProp is Ruby Liquid's lookup of a string key, where it differs from liquidjs's:
+// only a property computes size, first and last, which strings have too (in
+// characters), a Hash's first is its first pair, and an Array has no string keys.
+func rubyProp(v any, s string, dot bool, at int) (any, bool) {
+	switch m := v.(type) {
+	case string:
+		if !dot {
+			return Undefined{}, true
+		}
+		if !magic(s) {
+			return nil, false
+		}
+		if !utf8.ValidString(m) {
+			bail(at, "invalid-utf8", "%s of invalid UTF-8", s)
+		}
+		switch s {
+		case "size":
+			return boxInt(utf8.RuneCountInString(m)), true
+		case "first":
+			_, n := utf8.DecodeRuneInString(m)
+			return m[:n], true
+		}
+		_, n := utf8.DecodeLastRuneInString(m)
+		return m[len(m)-n:], true
+	case map[string]any:
+		if _, ok := m[s]; ok || !magic(s) {
+			return nil, false
+		}
+		if dot && s == "first" {
+			bail(at, "dialect-ruby-hash-first", "first of a Hash, which Ruby reads as its first pair")
+		}
+		if !dot || s == "last" {
+			return Undefined{}, true
+		}
+	case []any:
+		if !dot || !magic(s) {
+			return Undefined{}, true
+		}
+	}
+	return nil, false
 }
 
 // read records, for Engine.Reads, that the template reads key of the variable name, or
