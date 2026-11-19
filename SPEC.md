@@ -1,4 +1,4 @@
-# mist Liquid subset — v0.45.x
+# mist Liquid subset — v0.46.x
 
 _Last updated 2026-11-19. Parity target: liquidjs 10.26.0 configured with `new Liquid({ lenientIf: true })`, running with `TZ=UTC` and the en-US locale._
 
@@ -199,6 +199,7 @@ liquidjs's `renderLimit` (a time budget) has no counterpart. mist renders far fa
 | `RubyLookups` | Variables are looked up as Ruby Liquid's `Context#variable` does. When the first segment is `nil` or `false`, the whole lookup is that value (`{{ c.x }}` with a `false` `c` prints `false`). Past it, a property or index of `nil` or `false` is undefined, so `ErrUndefined` under strict. liquidjs reads a property of `null` as `null`. |
 | `RubyLax` | Conditions, outputs and `assign` values are read as Ruby Liquid 2.5's lax parser reads them. A condition is `and`/`or`-joined segments of `operand [ op [ operand ] ]`, grouped right to left: a missing right operand is nil, `<>` is `!=`, and the rest of a segment, filters included, is ignored (`{% if a == 1 t %}` is `{% if a == 1 %}`, `{% if a \| f %}` is `{% if a %}`). An output's or assign's value is its first operand, then the filters from the first `\|` (`{{ a b \| upcase }}` is `{{ a \| upcase }}`). Bails where Ruby raises or mist can't split the markup exactly as Ruby's `QuotedFragment` does: an unknown operator (`a = 1`, `a b`; `dialect-ruby-operator`), an operand glued to more (`a==1`; `dialect-ruby-fragment`), a quote in skipped text (`dialect-ruby-skipped-quote`), and `and`/`or` with no operand or glued to punctuation (`dialect-ruby-and-or`). |
 | `RawStrings` | String literals are read as Ruby Liquid's `QuotedString`: a string ends at the first matching quote and keeps its backslashes (`{{ "a\nb" }}` prints `a\nb`, `{{ "a\" }}` prints `a\`). An output's closing `}}` is found the same way. liquidjs unescapes `\n`, `\u00e9`, octal and escaped quotes. |
+| `RubyForElse` | A `for`'s `else` renders when the collection is empty after `offset` and `limit`, as in Ruby Liquid (`{% for x in xs offset: 3 %}…{% else %}E{% endfor %}` over three items prints `E`). liquidjs renders it only when the collection was empty before them. |
 | `NoDefaultLeniency` | Turns off the leading-`default` leniency rule. Combine with an overriding `default` in `Engine.Filters` to change `default` itself. |
 
 - **Values the hooks see:** data values as the caller supplied them (decode with `json.Decoder.UseNumber` to keep `2.0` distinct from `2`), `int64` for integral number literals and results (`3`, `2 | times: 1`) and `float64` for fractional ones (`1.5`), `nil` for nil, undefined and the `nil` literal (but `mist.Undefined{}` for undefined inside arrays and objects), and `mist.Blank` and `mist.Empty` for those keywords.
