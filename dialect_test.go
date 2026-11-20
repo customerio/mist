@@ -270,6 +270,10 @@ func TestDialectRubyLookups(t *testing.T) {
 		{"[{{ c[0] }}]", map[string]any{"c": "abc"}, "undefined"},
 		{"[{{ c[0] }}]", map[string]any{"c": int64(5)}, "undefined"},
 		{"[{{ c[0] }}]", map[string]any{"c": true}, "undefined"},
+		{"[{{ c.x }}]", map[string]any{"c": 5}, "undefined"},
+		{"[{{ c.first }}]", map[string]any{"c": int64(5)}, "undefined"},
+		{"[{{ c.size }}]", map[string]any{"c": true}, "undefined"},
+		{"{% if c.x == nil %}y{% endif %}", map[string]any{"c": 1.5}, "y"},
 		{"[{{ c[i] }}]", map[string]any{"c": []any{1}, "i": json.Number("1.5")}, "undefined"},
 		{"[{{ c[i] }}]", map[string]any{"c": map[string]any{"1.5": 1}, "i": json.Number("1.5")}, "undefined"},
 		{"[{{ c[i] }}]", map[string]any{"c": map[string]any{"true": 1}, "i": true}, "undefined"},
@@ -293,6 +297,9 @@ func TestDialectRubyLookups(t *testing.T) {
 	if _, err := e.Render("{{ h.first }}", map[string]any{"h": map[string]any{"k": 1}}, false); !errors.As(err, &me) || me.Code != "dialect-ruby-hash-first" {
 		t.Errorf("Hash first: got %v; want dialect-ruby-hash-first", err)
 	}
+	if _, err := e.Render("{{ n.size }}", map[string]any{"n": 5}, false); !errors.As(err, &me) || me.Code != "dialect-ruby-number-size" {
+		t.Errorf("Integer size: got %v; want dialect-ruby-number-size", err)
+	}
 	if _, err := e.Render("{{ s.size }}", map[string]any{"s": "a\xff"}, false); !errors.As(err, &me) || me.Code != "invalid-utf8" {
 		t.Errorf("invalid UTF-8: got %v; want invalid-utf8", err)
 	}
@@ -311,8 +318,8 @@ func TestDialectRubyLookups(t *testing.T) {
 	if _, err := e.Render("[{{ c[i] }}]", map[string]any{"c": []any{1}, "i": struct{}{}}, false); !errors.Is(err, ErrUnsupported) {
 		t.Errorf("index of an unknown type: got %v; want ErrUnsupported", err)
 	}
-	if _, err := e.Render("[{{ c[0] }}]", map[string]any{"c": json.Number("1.5")}, false); !errors.Is(err, ErrUnsupported) {
-		t.Errorf("index of a Float: got %v; want ErrUnsupported", err)
+	if out, err := e.Render("[{{ c[0] }}]", map[string]any{"c": json.Number("1.5")}, false); err != nil || out != "[]" {
+		t.Errorf("index of a Float: got %q, %v; want []", out, err)
 	}
 	e.Dialect.NumberText = true
 	if _, err := e.Render("[{{ c[1.0] }}]", map[string]any{"c": map[string]any{}}, true); !errors.Is(err, ErrUndefined) {
