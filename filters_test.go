@@ -457,9 +457,9 @@ func TestArraySizeCache(t *testing.T) {
 	}
 	vars := map[string]any{"items": items, "prefix": items[:299], "arrs": arrs}
 	for tpl, want := range map[string]int{
-		"{% for x in items %}{{ items | size }}{% endfor %}":                                         300 * 600,
-		"{{ items | size }}{{ prefix | size }}{{ items | size }}":                                    600 + 598 + 600,
-		"{% for a in arrs %}{{ a | size }}{% endfor %}{% for a in arrs %}{{ a | size }}{% endfor %}": 20 * 600,
+		"{% for x in items %}{% assign y = items | reverse %}{% endfor %}":                                                       300 * 600,
+		"{% assign y = items | reverse %}{% assign y = prefix | reverse %}{% assign y = items | reverse %}":                      600 + 598 + 600,
+		"{% for a in arrs %}{% assign y = a | reverse %}{% endfor %}{% for a in arrs %}{% assign y = a | reverse %}{% endfor %}": 20 * 600,
 	} {
 		for _, mem := range []int{want, want - 1} {
 			e := Engine{Limits: Limits{Memory: mem}}

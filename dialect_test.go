@@ -118,6 +118,7 @@ func TestDialectReject(t *testing.T) {
 		RawBlocks:         {"{% raw %}{{ x }}{% endraw %}"},
 		BlankKeyword:      {"{% if x == blank %}{% endif %}"},
 		EmptyKeyword:      {"{% if x == empty %}{% endif %}"},
+		LooseExpressions:  {"{% if a b %}{% endif %}", "{% if not a %}{% endif %}", "{% if a == %}{% endif %}", "{% if a == b == c %}{% endif %}", "{% if a and %}{% endif %}", "{% if a and b c %}{% endif %}", "{{ a and b }}", "{{ a b }}", "{% assign x = a == 1 %}", "{% echo a or b %}", "{% if false %}{{ and }}{% endif %}"},
 	} {
 		strict := Engine{Dialect: &Dialect{Reject: c}}
 		for _, tpl := range tpls {
@@ -134,6 +135,9 @@ func TestDialectReject(t *testing.T) {
 	}
 	if err := (Engine{Dialect: &Dialect{Reject: UnspacedOperators}}).Check("{% if x ==2 %}{% endif %}"); err != nil {
 		t.Errorf("whitespace before the operator is enough: %v", err)
+	}
+	if err := (Engine{Dialect: &Dialect{Reject: LooseExpressions}}).Check("{% if a == 1 and b or c contains 'x' | default: true %}{% endif %}{{ a | upcase }}{% assign x = a %}{% echo a %}"); err != nil {
+		t.Errorf("cond's grammar and lone operands: %v", err)
 	}
 }
 
@@ -282,6 +286,37 @@ func TestDialectRubyLookups(t *testing.T) {
 		{"[{{ c['0'] }}]", map[string]any{"c": map[string]any{"0": "z"}}, "[z]"},
 		{"[{{ c[1.5] }}]", map[string]any{"c": map[string]any{}}, "undefined"},
 		{"[{{ c[i] }}]", map[string]any{"c": map[string]any{"0": "z"}, "i": "0"}, "[z]"},
+		// strings' size, first and last count characters, as render's legacy engine does
+		{"[{{ s.first }}{{ s.last }}{{ s.size }}][{{ e.first }}{{ e.last }}{{ e.size }}][{{ s.first.last }}]", map[string]any{"s": "é😀x", "e": ""}, "[éx3][0][é]"},
+		{"{% if e.first == '' %}y{% endif %}", map[string]any{"e": ""}, "y"},
+		{"[{{ h.size }}{{ h.first }}{{ xs.first }}{{ xs.last }}{{ xs.size }}]", map[string]any{"h": map[string]any{"first": "F", "k": 1}, "xs": []any{1, 2}}, "[2F122]"},
+		// only a property computes them, and an Array has no string keys
+		{"[{{ xs['first'] }}]", map[string]any{"xs": []any{1}}, "undefined"},
+		{"[{{ xs['0'] }}]", map[string]any{"xs": []any{1}}, "undefined"},
+		{"[{{ xs.n }}]", map[string]any{"xs": []any{1}}, "undefined"},
+		{"[{{ h['size'] }}]", map[string]any{"h": map[string]any{}}, "undefined"},
+		{"[{{ h.last }}]", map[string]any{"h": map[string]any{"k": 1}}, "undefined"},
+		{"[{{ s[k] }}]", map[string]any{"s": "ab", "k": "size"}, "undefined"},
+		{"[{{ s.x }}]", map[string]any{"s": "ab"}, "undefined"},
+		{"[{{ h['k'] }}]", map[string]any{"h": map[string]any{"k": 1}}, "[1]"},
+		{"[{{ c[i] }}]", map[string]any{"c": []any{1, 2}, "i": "1"}, "undefined"},
+		{"[{{ c['size'] }}]", map[string]any{"c": []any{1}}, "undefined"},
+		{"[{{ c['size'] }}]", map[string]any{"c": map[string]any{}}, "undefined"},
+		{"[{{ c['size'] }}]", map[string]any{"c": map[string]any{"size": "s"}}, "[s]"},
+		{"[{{ c['size'] }}]", map[string]any{"c": "abc"}, "undefined"},
+		{"[{{ c[0] }}]", map[string]any{"c": "abc"}, "undefined"},
+		{"[{{ c[0] }}]", map[string]any{"c": int64(5)}, "undefined"},
+		{"[{{ c[0] }}]", map[string]any{"c": true}, "undefined"},
+		{"[{{ c[i] }}]", map[string]any{"c": []any{1}, "i": json.Number("1.5")}, "undefined"},
+		{"[{{ c[i] }}]", map[string]any{"c": map[string]any{"1.5": 1}, "i": json.Number("1.5")}, "undefined"},
+		{"[{{ c[i] }}]", map[string]any{"c": map[string]any{"true": 1}, "i": true}, "undefined"},
+		{"[{{ c[i] }}]", map[string]any{"c": []any{1}, "i": nil}, "undefined"},
+		{"[{{ c[i] }}]", map[string]any{"c": map[string]any{"": 1}, "i": []any{}}, "undefined"},
+		{"[{{ c[(1..2)] }}]", map[string]any{"c": []any{1, 2, 3}}, "undefined"},
+		{"{% for x in c %}{{ c[forloop.index0] }}{% endfor %}", map[string]any{"c": []any{1, 2}}, "12"},
+		{"{% if c[m] %}y{% else %}n{% endif %}", map[string]any{"c": []any{1}}, "n"},
+		{"{% if c[m.x] == nil %}y{% endif %}", map[string]any{"c": map[string]any{}}, "y"},
+		{"[{{ c[m] }}]", map[string]any{"c": []any{1}}, "undefined"},
 	} {
 		out, err := e.Render(c.tpl, c.vars, true)
 		if errors.Is(err, ErrUndefined) {
@@ -291,15 +326,37 @@ func TestDialectRubyLookups(t *testing.T) {
 			t.Errorf("%s with %v: got %q, %v; want %q", c.tpl, c.vars, out, err, c.want)
 		}
 	}
+	var me *Error
+	if _, err := e.Render("{{ h.first }}", map[string]any{"h": map[string]any{"k": 1}}, false); !errors.As(err, &me) || me.Code != "dialect-ruby-hash-first" {
+		t.Errorf("Hash first: got %v; want dialect-ruby-hash-first", err)
+	}
+	if _, err := e.Render("{{ s.size }}", map[string]any{"s": "a\xff"}, false); !errors.As(err, &me) || me.Code != "invalid-utf8" {
+		t.Errorf("invalid UTF-8: got %v; want invalid-utf8", err)
+	}
 	if out, err := e.Render("[{{ c.p.x }}]", map[string]any{"c": map[string]any{"p": nil}}, false); err != nil || out != "[]" {
 		t.Errorf("lax: got %q, %v; want []", out, err)
 	}
 	if out, err := (Engine{}).Render("[{{ c.p.x }}]", map[string]any{"c": map[string]any{"p": nil}}, true); err != nil || out != "[]" {
 		t.Errorf("liquidjs: got %q, %v; want [], a property of null being null", out, err)
 	}
+	if out, err := e.Render("[{{ c[m] }}]", map[string]any{"c": []any{1}}, false); err != nil || out != "[]" {
+		t.Errorf("lax undefined index: got %q, %v; want []", out, err)
+	}
+	if out, err := e.Render("[{{ m[0] }}]", nil, false); err != nil || out != "[]" {
+		t.Errorf("lax index of undefined: got %q, %v; want []", out, err)
+	}
+	if _, err := e.Render("[{{ c[i] }}]", map[string]any{"c": []any{1}, "i": struct{}{}}, false); !errors.Is(err, ErrUnsupported) {
+		t.Errorf("index of an unknown type: got %v; want ErrUnsupported", err)
+	}
+	if _, err := e.Render("[{{ c[0] }}]", map[string]any{"c": json.Number("1.5")}, false); !errors.Is(err, ErrUnsupported) {
+		t.Errorf("index of a Float: got %v; want ErrUnsupported", err)
+	}
 	e.Dialect.NumberText = true
 	if _, err := e.Render("[{{ c[1.0] }}]", map[string]any{"c": map[string]any{}}, true); !errors.Is(err, ErrUndefined) {
 		t.Errorf("Float index: got %v; want ErrUndefined", err)
+	}
+	if _, err := e.Render("[{{ c[1.0] }}]", map[string]any{"c": []any{1, 2}}, true); !errors.Is(err, ErrUndefined) {
+		t.Errorf("Float index of an Array: got %v; want ErrUndefined", err)
 	}
 }
 
@@ -372,5 +429,103 @@ func TestDialectContains(t *testing.T) {
 	}
 	if _, err := e.Render("{% if xs contains blank %}{% endif %}", vars, false); !errors.As(err, &me) || me.Code != "keyword-outside-equality" {
 		t.Errorf("keyword: got %v; want keyword-outside-equality", err)
+	}
+}
+
+// Outputs are render's legacy (Ruby Liquid 2.5 emulation) engine's.
+func TestDialectRubyLax(t *testing.T) {
+	e := Engine{Dialect: &Dialect{RubyLax: true}}
+	data := map[string]any{"a": 1, "b": 0, "f": false, "t": true, "n": nil, "s": "x"}
+	cond := func(c string) string { return "{% if " + c + " %}Y{% else %}N{% endif %}" }
+	for tpl, want := range map[string]string{
+		cond("a == 1 t"):          "Y",
+		cond("a == 2 t"):          "N",
+		cond("a == 1, t"):         "Y",
+		cond("a == 1 T or f"):     "Y",
+		cond("f | default: true"): "N",
+		cond("b | plus: 1 > 5"):   "Y",
+		cond("a =="):              "N",
+		cond("n =="):              "Y",
+		cond("n == and t"):        "Y",
+		cond("a 1"):               "Y",
+		cond("t and f or t"):      "Y",
+		cond("f or t and f"):      "N",
+		cond("a <> 1"):            "N",
+		cond("a == 1 and_x"):      "Y",
+		"{% unless a == 1 t %}Y{% endunless %}{% if f %}{% elsif t 1 %}E{% endif %}": "E",
+		"{{ a b }}|{{ a, b }}|{{ a == 1 }}|{{ s junk | upcase }}":                    "1|1|1|X",
+		"{% assign x = a b %}{{ x }}{% assign y = s | upcase %}{{ y }}":              "1X",
+	} {
+		if out, err := e.Render(tpl, data, false); err != nil || out != want {
+			t.Errorf("%s: got %q, %v; want %q", tpl, out, err, want)
+		}
+	}
+	for tpl, code := range map[string]string{
+		cond("a b"):                           "dialect-ruby-operator",
+		cond("a = 1"):                         "dialect-ruby-operator",
+		cond("not a"):                         "reserved-word-variable",
+		cond("a==1"):                          "dialect-ruby-fragment",
+		cond(`a == "x"y`):                     "dialect-ruby-fragment",
+		cond(`a == 1 "x"`):                    "dialect-ruby-skipped-quote",
+		cond("and a"):                         "dialect-ruby-and-or",
+		cond("a and"):                         "dialect-ruby-and-or",
+		cond("a or, b"):                       "dialect-ruby-and-or",
+		`{{ s "q" | upcase }}`:                "dialect-ruby-skipped-quote",
+		"{% if false %}{{ a==1 }}{% endif %}": "dialect-ruby-fragment",
+	} {
+		_, err := e.Render(tpl, data, false)
+		var me *Error
+		if !errors.As(err, &me) || me.Code != code {
+			t.Errorf("%s: got %v; want %s", tpl, err, code)
+		}
+		if err := e.Check(tpl); !errors.Is(err, ErrUnsupported) {
+			t.Errorf("%s: Check got %v; want ErrUnsupported", tpl, err)
+		}
+	}
+}
+
+// Outputs are render's legacy (Ruby Liquid 2.5 emulation) engine's.
+func TestDialectRawStrings(t *testing.T) {
+	e := Engine{Dialect: &Dialect{RawStrings: true, RubyLax: true}}
+	data := map[string]any{"s": `a\b`}
+	for tpl, want := range map[string]string{
+		`{{ "a\nb" }}`:                                          `a\nb`,
+		`{{ "c:\temp" | append: "\x" }}`:                        `c:\temp\x`,
+		`{% assign x = "\u00e9" %}{{ x }}`:                      `\u00e9`,
+		`{{ "\101" }}|{{ "\\" }}|{{ "\'" }}`:                    `\101|\\|\'`,
+		`{{ "a\" | append: "b" }}|{{ "a\" }}{{ "b" }}`:          `a\b|a\b`,
+		`{% if s == "a\b" %}Y{% else %}N{% endif %}`:            "Y",
+		`{% case s %}{% when "a\b" %}W{% else %}E{% endcase %}`: "W",
+		`{{ s | replace: "\", "/" }}`:                           "a/b",
+	} {
+		if out, err := e.Render(tpl, data, false); err != nil || out != want {
+			t.Errorf("%s: got %q, %v; want %q", tpl, out, err, want)
+		}
+	}
+}
+
+// Outputs are render's legacy (Ruby Liquid 2.5 emulation) engine's.
+func TestDialectRubyForElse(t *testing.T) {
+	e := Engine{Dialect: &Dialect{RubyForElse: true}}
+	data := map[string]any{"xs": []any{1, 2, 3}, "em": []any{}, "n": nil, "i": 3, "z": 0}
+	loop := func(head string) string { return "{% for x in " + head + " %}{{ x }}{% else %}E{% endfor %}" }
+	for tpl, want := range map[string]string{
+		loop("xs offset: 3"):          "E",
+		loop("xs limit: 0"):           "E",
+		loop("xs reversed offset: 3"): "E",
+		loop("xs offset: 1 limit: 1"): "2",
+		loop("(1..3) offset: 3"):      "E",
+		loop("(i..z) limit: 1"):       "E",
+		loop("em limit: 2"):           "E",
+		loop("n offset: 1"):           "E",
+		loop("missing"):               "E",
+		// in a dead branch
+		"{% if false %}" + loop("xs limit: 0") + "{% endif %}": "",
+		// nested
+		"{% for x in xs limit: 1 %}{% for y in em %}{% else %}I{% endfor %}{% endfor %}{% for x in xs offset: 9 %}{% else %}E{% endfor %}": "IE",
+	} {
+		if out, err := e.Render(tpl, data, false); err != nil || out != want {
+			t.Errorf("%s: got %q, %v; want %q", tpl, out, err, want)
+		}
 	}
 }

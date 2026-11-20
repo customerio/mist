@@ -45,8 +45,27 @@ type Dialect struct {
 
 	// RubyLookups looks variables up as Ruby Liquid's Context#variable does: when the
 	// first segment is nil or false the whole lookup is that value, and past it a
-	// property or index of nil or false is undefined (ErrUndefined under strict).
+	// property or index of nil or false is undefined (ErrUndefined under strict). A
+	// bracket index reads a Hash by a String key and an Array by an Integer, and an
+	// undefined index in a condition is nil. Only a property computes size, first and
+	// last, strings' in characters, and a Hash's computed first (its first pair) bails.
 	RubyLookups bool
+
+	// RubyLax reads conditions, outputs and assigns as Ruby Liquid 2.5's lax parser
+	// does. A condition is and/or-joined segments of `operand [op [operand]]`: a
+	// missing right operand is nil, and anything after a segment, filters included,
+	// is ignored. An output's or assign's value is its first operand, then its
+	// filters from the first `|`. An operator Ruby doesn't know (Ruby's "Unknown
+	// operator" error), and anything mist can't split exactly as Ruby does, bails.
+	RubyLax bool
+
+	// RawStrings reads string literals as Ruby Liquid's QuotedString does: a string
+	// ends at the first matching quote and keeps its backslashes.
+	RawStrings bool
+
+	// RubyForElse renders a for's else when the collection is empty after offset and
+	// limit, as Ruby Liquid does; liquidjs tests it before them.
+	RubyForElse bool
 }
 
 // Constructs is a set of template constructs a Dialect can reject.
@@ -60,6 +79,7 @@ const (
 	RawBlocks                                // {% raw %}…{% endraw %}
 	BlankKeyword                             // == blank, != blank
 	EmptyKeyword                             // == empty, != empty
+	LooseExpressions                         // operands and operators beyond cond's grammar: {{ a and b }}, {% if a b %}, not, a == b == c, a dangling operator
 )
 
 // Keyword is how a keyword literal reaches Dialect.Compare and Dialect.Output.
