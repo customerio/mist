@@ -137,6 +137,21 @@ func (r *renderer) filters(v val, eval bool) val {
 // ponytail: charges inputs, as liquidjs does, plus the output of replace and date, the
 // filters whose output can dwarf their input; other results aren't charged.
 func (r *renderer) spend(name string, v val, args []val, at int) {
+	// liquidjs charges these nothing, and the built-ins don't read an array's items or,
+	// except size's and last's, a string, so a loop over a big value isn't charged it each time.
+	if _, registered := r.filterFns[name]; !registered {
+		_, isStr := v.str()
+		switch name {
+		case "default", "raw", "first":
+			r.charge(1, at)
+			return
+		case "size", "last":
+			if !isStr {
+				r.charge(1, at)
+				return
+			}
+		}
+	}
 	in := r.memSize(v)
 	cost := in
 	for _, a := range args {
