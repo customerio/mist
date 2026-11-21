@@ -862,9 +862,13 @@ func rubyIndex(v any, k val, at int) any {
 		}
 	case string, bool, int, int64:
 	default:
-		if _, ok := rubyInt(val{x: v}); !ok {
-			return key(v, k, at) // a Float or other value Ruby may index differently
+		if _, ok := rubyInt(val{x: v}); ok {
+			break
 		}
+		if _, ok := num(v, at); ok {
+			bail(at, "dialect-ruby-float-index", "index of a Float, which render's Ruby Liquid reads as nil")
+		}
+		return key(v, k, at)
 	}
 	return Undefined{}
 }
@@ -933,6 +937,10 @@ func rubyProp(v any, s string, at int) (any, bool) {
 	case []any:
 		if !magic(s) {
 			return Undefined{}, true
+		}
+	default:
+		if _, ok := num(v, at); ok && s == "size" {
+			bail(at, "dialect-ruby-number-size", "size of a number, which Ruby reads as an Integer's byte width")
 		}
 	}
 	return nil, false

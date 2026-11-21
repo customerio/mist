@@ -134,6 +134,11 @@ func prop(v any, key string, at int) any {
 			bail(at, "string-own-property", "property %q of a string, an own JavaScript property", key)
 		}
 		return Undefined{}
+	case bool:
+		return Undefined{} // ownPropertyOnly: primitives have no own properties
+	}
+	if _, ok := num(v, at); ok {
+		return Undefined{}
 	}
 	bail(at, "property-on-scalar", "property %q on %T", key, v)
 	return nil

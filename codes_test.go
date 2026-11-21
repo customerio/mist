@@ -147,6 +147,8 @@ var (
 		"dialect-ruby-and-or":           "needs a dialect",
 		"dialect-ruby-fragment":         "needs a dialect",
 		"dialect-ruby-hash-first":       "needs a dialect",
+		"dialect-ruby-float-index":      "needs a dialect",
+		"dialect-ruby-number-size":      "needs a dialect",
 		"dialect-ruby-operator":         "needs a dialect",
 		"dialect-ruby-skipped-quote":    "needs a dialect",
 	}

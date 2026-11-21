@@ -339,7 +339,7 @@ var runtimeCodes = map[string]bool{
 	"builtin-variable-name": true, "case-mapping": true, "contains-object": true, "date-input-type": true,
 	"date-locale-format": true, "date-string-format": true, "date-timezone-argument": true,
 	"date-timezone-name": true, "date-timezone-sub-minute": true, "date-timezone-unknown": true,
-	"date-width": true, "date-year-range": true, "date-zone-name": true, "first-last-empty": true,
+	"date-width": true, "dialect-ruby-float-index": true, "dialect-ruby-number-size": true, "date-year-range": true, "date-zone-name": true, "first-last-empty": true,
 	"first-last-type": true, "for-over-non-array": true, "for-parameter-value": true, "group-by-object": true,
 	"index-type": true, "invalid-utf8": true, "item-not-object": true, "iteration-limit": true,
 	"join-nested-array": true, "json-type": true, "math-non-finite": true, "memory-limit": true,
