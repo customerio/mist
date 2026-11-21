@@ -318,8 +318,8 @@ func TestDialectRubyLookups(t *testing.T) {
 	if _, err := e.Render("[{{ c[i] }}]", map[string]any{"c": []any{1}, "i": struct{}{}}, false); !errors.Is(err, ErrUnsupported) {
 		t.Errorf("index of an unknown type: got %v; want ErrUnsupported", err)
 	}
-	if out, err := e.Render("[{{ c[0] }}]", map[string]any{"c": json.Number("1.5")}, false); err != nil || out != "[]" {
-		t.Errorf("index of a Float: got %q, %v; want []", out, err)
+	if _, err := e.Render("[{{ c[0] }}]", map[string]any{"c": json.Number("1.5")}, false); !errors.As(err, &me) || me.Code != "dialect-ruby-float-index" {
+		t.Errorf("index of a Float: got %v; want dialect-ruby-float-index", err)
 	}
 	e.Dialect.NumberText = true
 	if _, err := e.Render("[{{ c[1.0] }}]", map[string]any{"c": map[string]any{}}, true); !errors.Is(err, ErrUndefined) {

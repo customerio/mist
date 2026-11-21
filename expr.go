@@ -862,9 +862,13 @@ func rubyIndex(v any, k val, at int) any {
 		}
 	case string, bool, int, int64:
 	default:
-		if _, ok := rubyInt(val{x: v}); !ok {
-			return key(v, k, at) // a Float, which has no Float#[], or a type key bails on
+		if _, ok := rubyInt(val{x: v}); ok {
+			break
 		}
+		if _, ok := num(v, at); ok {
+			bail(at, "dialect-ruby-float-index", "index of a Float, which render's Ruby Liquid reads as nil")
+		}
+		return key(v, k, at)
 	}
 	return Undefined{}
 }
