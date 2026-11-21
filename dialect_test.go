@@ -202,6 +202,43 @@ func TestDialectNoBuiltinFilters(t *testing.T) {
 	}
 }
 
+// With PassUnknownFilters, NoBuiltinFilters still passes through names liquidjs doesn't define.
+func TestDialectNoBuiltinFiltersPassUnknown(t *testing.T) {
+	e := Engine{
+		Dialect:            &Dialect{NoBuiltinFilters: true},
+		PassUnknownFilters: true,
+		Filters: map[string]FilterFunc{
+			"back": func(Filter) (any, error) { return nil, ErrBuiltin },
+			"cat":  func(f Filter) (any, error) { return f.Input.(string) + "c", nil },
+		},
+	}
+	vars := map[string]any{"x": "a"}
+	for _, tc := range []struct{ tpl, want string }{
+		{"{{ x | nope: 1, 'b' | cat }}", "ac"},
+		{"{% assign y = x | Upcase %}{{ y }}", "a"},
+		{"{{ missing | nope }}", ""},
+	} {
+		if out, err := e.Render(tc.tpl, vars, false); err != nil || out != tc.want {
+			t.Errorf("%s: got %q, %v; want %q", tc.tpl, out, err, tc.want)
+		}
+	}
+	if _, err := e.Render("{{ x | nope: missing }}", vars, true); !errors.Is(err, ErrUndefined) {
+		t.Errorf("strict undefined argument: got %v; want ErrUndefined", err)
+	}
+	for tpl, code := range map[string]string{"{{ x | upcase }}": "filter:upcase", "{{ x | back }}": "filter:back", "{{ x | default: 1 }}": "filter:default"} {
+		var me *Error
+		if _, err := e.Render(tpl, vars, false); !errors.As(err, &me) || me.Code != code {
+			t.Errorf("%s: got %v; want %s", tpl, err, code)
+		}
+	}
+	if err := e.Check("{{ x | upcase }}"); err == nil {
+		t.Error("Check upcase: got nil; want a bail")
+	}
+	if err := e.Check("{{ x | nope }}"); err != nil {
+		t.Errorf("Check: got %v", err)
+	}
+}
+
 // StrictAssign raises an undefined assign value under strict.
 func TestDialectStrictAssign(t *testing.T) {
 	tpl := "{% assign x = missing %}[{{ x }}]"
