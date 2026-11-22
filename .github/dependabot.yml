@@ -10,11 +10,14 @@ updates:
       actions:
         patterns: ["*"]
   - package-ecosystem: gomod
-    directory: /
+    directory: /tools # CI tools; mist itself has no dependencies
     schedule:
       interval: weekly
     cooldown:
       default-days: 7 # let a new release age before it becomes a PR
+    groups:
+      tools:
+        patterns: ["*"]
   - package-ecosystem: npm
     directory: /scripts
     schedule:
