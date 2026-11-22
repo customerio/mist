@@ -35,7 +35,8 @@ type Dialect struct {
 
 	// NoBuiltinFilters makes every filter that isn't in Engine.Filters bail,
 	// built-ins included, for an engine whose filters all differ from liquidjs's.
-	// A registered filter returning ErrBuiltin bails too.
+	// A registered filter returning ErrBuiltin bails too. With
+	// Engine.PassUnknownFilters, a name liquidjs doesn't define still passes through.
 	NoBuiltinFilters bool
 
 	// StrictAssign makes an undefined variable in an assign's value ErrUndefined under
