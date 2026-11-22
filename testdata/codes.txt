@@ -33,6 +33,7 @@ dialect-raw-filter
 dialect-ruby-and-or
 dialect-ruby-float-index
 dialect-ruby-fragment
+dialect-ruby-fragment-undefined
 dialect-ruby-hash-first
 dialect-ruby-number-size
 dialect-ruby-operator

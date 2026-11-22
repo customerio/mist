@@ -316,7 +316,14 @@ func (r *renderer) output(b, e int) {
 	live := r.live()
 	r.ws()
 	start := r.p
-	v, lone, end := r.value(live, false, false)
+	var v val
+	var lone bool
+	var end int
+	if r.rubyLax() {
+		v, lone, end = r.rubyValue(live, false, true)
+	} else {
+		v, lone, end = r.value(live, false, false)
+	}
 	text := r.src[start:end]
 	r.strictLoose(lone, b)
 	if k := v.keyword(); k != "" {
@@ -384,7 +391,7 @@ func (r *renderer) tag(b, e, next int, lt, rt bool) (int, bool) {
 		}
 		f.sawElse, f.active, f.taken = true, !f.taken, true
 	case "case":
-		v := r.expr(live, true) // lenientIf, as for conditions
+		v := r.laxExpr(live, true) // lenientIf, as for conditions
 		if k := v.keyword(); k != "" {
 			bail(b, "keyword-outside-equality", "%s is only supported in conditions and output", k)
 		}
@@ -404,7 +411,7 @@ func (r *renderer) tag(b, e, next int, lt, rt bool) (int, bool) {
 		eval, match := f.parentLive && !r.check && r.halt == 0, false
 		for {
 			at := r.pos()
-			v := r.expr(eval && !match, true)
+			v := r.laxExpr(eval && !match, true)
 			match = match || eval && r.when(f.subject(), v, at)
 			r.ws()
 			if r.p == len(r.src) {
@@ -452,7 +459,7 @@ func (r *renderer) tag(b, e, next int, lt, rt bool) (int, bool) {
 		if r.peek() == '(' {
 			lo, n = r.rangeBounds(live)
 		} else {
-			coll = r.expr(live, false).x
+			coll = r.laxExpr(live, false).x
 		}
 		f := frame{kind: kFor, parentLive: live, body: next, rtrim: rt, name: v, collStart: int32(r.base + cs), collEnd: int32(r.pos())}
 		mods := r.forParams(live)

@@ -54,8 +54,10 @@ type Dialect struct {
 	// does. A condition is and/or-joined segments of `operand [op [operand]]`: a
 	// missing right operand is nil, and anything after a segment, filters included,
 	// is ignored. An output's or assign's value is its first operand, then its
-	// filters from the first `|`. An operator Ruby doesn't know (Ruby's "Unknown
-	// operator" error), and anything mist can't split exactly as Ruby does, bails.
+	// filters from the first `|`. A glued operand such as `x==2` is a lookup of its
+	// word runs, `x["2"]`, as Ruby's Context#variable reads it. An operator Ruby
+	// doesn't know (Ruby's "Unknown operator" error), and anything mist can't split
+	// exactly as Ruby does, bails.
 	RubyLax bool
 
 	// RawStrings reads string literals as Ruby Liquid's QuotedString does: a string
