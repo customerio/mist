@@ -485,6 +485,8 @@ func TestDialectRubyGlued(t *testing.T) {
 		{"{% for y in ys==1 %}{{ y }}{% endfor %}{% for y in q==1 %}{{ y }}{% else %}E{% endfor %}", false, "12E"},
 		{"{% if false %}{{ a==1 }}{% endif %}", false, ""},
 		{"{{a==1}}|{%if a==1%}Y{%endif%}", false, "A1|Y"},
+		{`{{ a["1"] }}|{{ xs[1] }}|{{ a['b'].c }}|{% if xs[0] == 4 %}Y{% endif %}|{% for y in ys["1"] %}{{ y }}{% endfor %}`, false, "A1|5|ABC|Y|12"},
+		{`{{ q["k"] }}`, false, ""},
 	} {
 		if out, err := e.Render(c.tpl, data, c.strict); err != nil || out != c.want {
 			t.Errorf("%s (strict %v): got %q, %v; want %q", c.tpl, c.strict, out, err, c.want)

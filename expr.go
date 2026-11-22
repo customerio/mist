@@ -358,8 +358,6 @@ func (r *renderer) rubyGlued(eval, lenient bool) (v val, ok bool) {
 	for i := 0; i < len(f); {
 		c := f[i]
 		switch {
-		case c >= utf8.RuneSelf || strings.IndexByte("[](){}\\", c) >= 0:
-			bail(at, "dialect-ruby-fragment", "an operand Ruby reads differently")
 		case rubyWord(c):
 			j := i + 1
 			for j < len(f) && rubyWord(f[j]) {
@@ -424,22 +422,25 @@ func rubyWord(c byte) bool {
 	return c == '_' || c == '-' || isDigit(c) || c|0x20 >= 'a' && c|0x20 <= 'z'
 }
 
-// glued reports a word-led fragment that isn't a plain dotted path.
+// glued reports a word-led fragment that isn't a plain dotted path. One holding a
+// bracket, paren, backslash or non-ASCII byte is left to expr, which reads a bracket
+// path and bails on the rest.
 func glued(f string) bool {
 	if f == "" || !isIdentStart(f[0]) {
 		return false
 	}
+	g := false
 	for i := 1; i < len(f); i++ {
 		switch c := f[i]; {
+		case c >= utf8.RuneSelf || strings.IndexByte("[](){}\\", c) >= 0:
+			return false
 		case c == '.':
-			if i == len(f)-1 || f[i+1] == '.' {
-				return true
-			}
-		case !isIdentChar(c) && c < utf8.RuneSelf:
-			return true
+			g = g || i == len(f)-1 || f[i+1] == '.'
+		case !isIdentChar(c):
+			g = true
 		}
 	}
-	return false
+	return g
 }
 
 // unquotedBlank reports a blank in s outside quotes, where a Ruby QuotedFragment ends.
