@@ -431,17 +431,15 @@ func TestDialectRubyLax(t *testing.T) {
 		}
 	}
 	for tpl, code := range map[string]string{
-		cond("a b"):                           "dialect-ruby-operator",
-		cond("a = 1"):                         "dialect-ruby-operator",
-		cond("not a"):                         "reserved-word-variable",
-		cond("a==1"):                          "dialect-ruby-fragment",
-		cond(`a == "x"y`):                     "dialect-ruby-fragment",
-		cond(`a == 1 "x"`):                    "dialect-ruby-skipped-quote",
-		cond("and a"):                         "dialect-ruby-and-or",
-		cond("a and"):                         "dialect-ruby-and-or",
-		cond("a or, b"):                       "dialect-ruby-and-or",
-		`{{ s "q" | upcase }}`:                "dialect-ruby-skipped-quote",
-		"{% if false %}{{ a==1 }}{% endif %}": "dialect-ruby-fragment",
+		cond("a b"):            "dialect-ruby-operator",
+		cond("a = 1"):          "dialect-ruby-operator",
+		cond("not a"):          "reserved-word-variable",
+		cond(`a == "x"y`):      "dialect-ruby-fragment",
+		cond(`a == 1 "x"`):     "dialect-ruby-skipped-quote",
+		cond("and a"):          "dialect-ruby-and-or",
+		cond("a and"):          "dialect-ruby-and-or",
+		cond("a or, b"):        "dialect-ruby-and-or",
+		`{{ s "q" | upcase }}`: "dialect-ruby-skipped-quote",
 	} {
 		_, err := e.Render(tpl, data, false)
 		var me *Error
@@ -451,6 +449,74 @@ func TestDialectRubyLax(t *testing.T) {
 		if err := e.Check(tpl); !errors.Is(err, ErrUnsupported) {
 			t.Errorf("%s: Check got %v; want ErrUnsupported", tpl, err)
 		}
+	}
+}
+
+// Outputs are render's legacy (Ruby Liquid 2.5 emulation) engine's.
+func TestDialectRubyGlued(t *testing.T) {
+	e := Engine{Dialect: &Dialect{RubyLax: true}}
+	data := map[string]any{
+		"a": map[string]any{"1": "A1", "b": map[string]any{"c": "ABC"}, "x y": 1}, "c": map[string]any{"plan": map[string]any{"pro": "P"}},
+		"s": "héllo", "xs": []any{4, 5}, "h": map[string]any{"size": "hs", "k": "v"}, "i": 5, "n": nil, "f": false,
+		"true": map[string]any{"1": "T"}, "contains": map[string]any{"1": "C"}, "w": "A1", "ys": map[string]any{"1": []any{1, 2}},
+	}
+	cond := func(c string) string { return "{% if " + c + " %}Y{% else %}N{% endif %}" }
+	for _, c := range []struct {
+		tpl    string
+		strict bool
+		want   string
+	}{
+		{cond("a==1"), false, "Y"},
+		{cond("a==2"), false, "N"},
+		{cond("a==1 == 'A1'"), false, "Y"},
+		{cond("a== 1"), false, "Y"},
+		{cond("a==1 and xs==0"), false, "N"},
+		{cond("q==1"), true, "N"},
+		{"{% unless a==1 %}U{% endunless %}{% if false %}{% elsif a==1 %}E{% endif %}", false, "E"},
+		{`{{ a==1 }}|{{ c.plan=="pro" }}|{{ a:1 }}|{{ a+b==c }}|{{ a.b..c }}|{{ a..b.c. }}`, false, "A1|P|A1|ABC|ABC|ABC"},
+		{`{{ a=='1' | downcase }}|{{ a==1, x }}|{{ a==1 junk }}|{{ a=="x y" }}`, false, "a1|A1|A1|"},
+		{"{{ xs==size }}|{{ xs==first }}|{{ xs==last }}|{{ s==size }}|{{ s==first }}|{{ h==size }}", false, "2|4|5|5|h|hs"},
+		{"{{ xs==0 }}|{{ i==x }}|{{ n==x }}|{{ f==x }}|{{ q==x }}|{{ true==1 }}|{{ contains==1 }}", false, "|||false||T|C"},
+		{"{{ n==x }}|{{ f==x }}", true, "|false"},
+		{"{% case a==1 %}{% when 'A1' %}W{% else %}E{% endcase %}", false, "W"},
+		{"{% case w %}{% when x, a==1 %}W{% else %}E{% endcase %}", false, "W"},
+		{"{% case w %}{% when q==1 %}W{% else %}E{% endcase %}", true, "E"},
+		{"{% case q==1 %}{% when nil %}W{% else %}E{% endcase %}", true, "W"},
+		{"{% for y in ys==1 %}{{ y }}{% endfor %}{% for y in q==1 %}{{ y }}{% else %}E{% endfor %}", false, "12E"},
+		{"{% if false %}{{ a==1 }}{% endif %}", false, ""},
+		{"{{a==1}}|{%if a==1%}Y{%endif%}", false, "A1|Y"},
+	} {
+		if out, err := e.Render(c.tpl, data, c.strict); err != nil || out != c.want {
+			t.Errorf("%s (strict %v): got %q, %v; want %q", c.tpl, c.strict, out, err, c.want)
+		}
+	}
+	for _, c := range []struct {
+		tpl    string
+		strict bool
+		code   string
+	}{
+		{"{{ q==1 }}", true, "dialect-ruby-fragment-undefined"},
+		{"{{ i==x }}", true, "dialect-ruby-fragment-undefined"}, // Ruby names it i.x, render ["i"]["x"]
+		{"{% for y in q==1 %}{% endfor %}", true, "dialect-ruby-fragment-undefined"},
+		{cond("xs==empty?"), false, "dialect-ruby-fragment"},
+		{cond("a[0]==1"), false, "dialect-ruby-fragment"},
+		{cond("a==(1)"), false, "dialect-ruby-fragment"},
+		{cond(`a=='\\'`), false, "dialect-ruby-fragment"},
+		{cond("café==1"), false, "dialect-ruby-fragment"},
+		{cond("2+3"), false, "dialect-ruby-fragment"},
+		{cond(`a=="b`), false, "dialect-ruby-fragment"},
+		{"{% for x in xs %}{{ forloop==index }}{% endfor %}", false, "dialect-ruby-fragment"},
+		{"{% assign v = a==1 %}", false, "dialect-ruby-fragment"},
+	} {
+		_, err := e.Render(c.tpl, data, c.strict)
+		var me *Error
+		if !errors.As(err, &me) || me.Code != c.code {
+			t.Errorf("%s (strict %v): got %v; want %s", c.tpl, c.strict, err, c.code)
+		}
+	}
+	reads, all, err := e.Reads("{{ a==1 }}{{ xs==size }}{% if q==x %}{% endif %}")
+	if want := map[string][]string{"a": {"1"}, "xs": nil, "q": {"x"}}; err != nil || all || !reflect.DeepEqual(reads, want) {
+		t.Errorf("Reads: got %v, %v; want %v", reads, err, want)
 	}
 }
 
