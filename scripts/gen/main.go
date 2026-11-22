@@ -469,9 +469,9 @@ func (g *gen) cmp() string {
 	return g.expr() + g.ws() + op + g.ws() + g.expr()
 }
 
-// ordered is mostly an operand < and > accept: a number, or a path to a number or string.
+// ordered is half the time a number or string, or a path to one, and otherwise any operand.
 func (g *gen) ordered() string {
-	if !g.mostly(3) {
+	if g.r.IntN(2) == 0 {
 		return g.expr()
 	}
 	fs := g.find(names, true, func(v any) bool {
@@ -482,7 +482,7 @@ func (g *gen) ordered() string {
 		return false
 	})
 	if len(fs) == 0 || g.r.IntN(4) == 0 {
-		return g.pick([]string{fmt.Sprint(g.r.IntN(21) - 10), "1.5", "-2.5", "'a'", "'10'"})
+		return g.pick([]string{fmt.Sprint(g.r.IntN(21) - 10), "1.5", "-2.5", "'a'", "'10'", "'é'", "'😀'", "''", "nil", "true"})
 	}
 	return fs[g.r.IntN(len(fs))].path
 }

@@ -3,6 +3,8 @@ package mist
 import (
 	"math"
 	"strings"
+	"unicode/utf16"
+	"unicode/utf8"
 )
 
 var mirror = map[string]string{"==": "==", "!=": "!=", "<": ">", ">": "<", "<=": ">=", ">=": "<="}
@@ -22,30 +24,22 @@ func compare(op string, a, b val, at int) bool {
 	case "!=":
 		return !eq(a, b, at)
 	}
+	if isNilLit(a) || isNilLit(b) {
+		return false // liquidjs's NullDrop orders before and after nothing
+	}
+	// JavaScript's relational comparison: two strings by UTF-16 units, anything else as numbers.
+	a, b = jsPrimitive(a, at), jsPrimitive(b, at)
 	var c int
-	x, xNum := a.num(at)
-	y, yNum := b.num(at)
 	xs, xStr := a.str()
 	ys, yStr := b.str()
-	// JavaScript compares a number and a string as numbers, reading the string as Number does.
-	switch {
-	case xNum && yStr:
-		y, yNum = jsNumberOf(b, at), true
-	case xStr && yNum:
-		x, xNum = jsNumberOf(a, at), true
-	}
-	switch {
-	case xNum && yNum:
+	if xStr && yStr {
+		c = cmp16(xs, ys, at)
+	} else {
+		x, y := jsNumberOf(a, at), jsNumberOf(b, at)
 		if math.IsNaN(x) || math.IsNaN(y) {
 			return false
 		}
 		c = cmpFloat(x, y)
-	case xNum:
-		bail(at, "ordering-types", "%s between number and %T", op, b.any())
-	case xStr && yStr && ascii(xs) && ascii(ys):
-		c = strings.Compare(xs, ys)
-	default:
-		bail(at, "ordering-types", "%s needs two numbers, two ASCII strings, or a number and a string", op)
 	}
 	switch op {
 	case "<":
@@ -68,14 +62,63 @@ func cmpFloat(x, y float64) int {
 	return 0
 }
 
-// ascii strings compare the same in Go (bytes) and JS (UTF-16 units).
-func ascii(s string) bool {
-	for i := range len(s) {
-		if s[i] >= 0x80 {
-			return false
+// cmp16 orders strings by UTF-16 code units, as JavaScript does.
+func cmp16(a, b string, at int) int {
+	if !utf8.ValidString(a) || !utf8.ValidString(b) {
+		bail(at, "invalid-utf8", "ordering of invalid UTF-8")
+	}
+	for a != "" && b != "" {
+		x, n := utf8.DecodeRuneInString(a)
+		y, m := utf8.DecodeRuneInString(b)
+		if x != y {
+			return cmpFloat(float64(units16(x)), float64(units16(y)))
+		}
+		a, b = a[n:], b[m:]
+	}
+	return len(a) - len(b)
+}
+
+// units16 packs r's UTF-16 encoding into one number that orders as the units do.
+func units16(r rune) uint32 {
+	if r < 0x10000 {
+		return uint32(r) << 16
+	}
+	hi, lo := utf16.EncodeRune(r)
+	return uint32(hi)<<16 | uint32(lo)
+}
+
+// jsPrimitive is JavaScript's ToPrimitive: an array joins its items with commas, an object
+// prints as [object Object].
+func jsPrimitive(v val, at int) val {
+	switch x := v.check(at).x.(type) {
+	case map[string]any:
+		return strVal(string(jsJoin(nil, []any{x}, at)))
+	case []any:
+		return strVal(string(jsJoin(nil, x, at)))
+	}
+	return v
+}
+
+func jsJoin(dst []byte, a []any, at int) []byte {
+	for i, e := range a {
+		if i > 0 {
+			dst = append(dst, ',')
+		}
+		switch x := e.(type) {
+		case nil, Undefined:
+		case []any:
+			dst = jsJoin(dst, x, at)
+		case map[string]any:
+			_, ts := x["toString"]
+			if _, vo := x["valueOf"]; ts || vo {
+				bail(at, "ordering-types", "ordering of an object with its own toString or valueOf") // JavaScript throws
+			}
+			dst = append(dst, "[object Object]"...)
+		default:
+			dst = stringify(dst, val{x: e}, at)
 		}
 	}
-	return true
+	return dst
 }
 
 // eq mirrors liquidjs: === on scalars, except the nil literal matches null and undefined.
