@@ -20,3 +20,14 @@ cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json \
   --certificate-identity-regexp '^https://github.com/customerio/mist/\.github/workflows/release\.yml@refs/tags/v'
 gh attestation verify mist_<version>_linux_amd64.tar.gz -R customerio/mist
 ```
+
+Releases v0.15.1 through v0.39.0 were signed before the repository moved from `hownowstephen/mist`, so they carry that identity, and their attestation is only in the attached bundle:
+
+```bash
+cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github.com/hownowstephen/mist/\.github/workflows/release\.yml@refs/tags/v'
+gh attestation verify mist_<version>_linux_amd64.tar.gz --bundle mist_<version>.intoto.jsonl -R hownowstephen/mist
+```
+
+Releases before v0.15.1 are unsigned.

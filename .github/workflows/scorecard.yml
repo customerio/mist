@@ -12,6 +12,7 @@ permissions: read-all
 jobs:
   scorecard:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       security-events: write # upload results to code scanning
       id-token: write # publish results to the OpenSSF API
