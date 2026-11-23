@@ -450,7 +450,7 @@ func (r *renderer) tag(b, e, next int, lt, rt bool) (int, bool) {
 			bail(b, "for-syntax", "expected: for <ident> in <path>")
 		}
 		r.ws()
-		if c := r.peek(); !isIdentStart(c) && c != '(' {
+		if c := r.peek(); !isIdentStart(c) && c != '(' && (c != '{' || !r.rubyLax()) {
 			bail(r.base+r.p, "for-collection", "for collection must be a variable path or a range")
 		}
 		cs := r.p

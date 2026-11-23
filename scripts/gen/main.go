@@ -425,6 +425,9 @@ func (g *gen) loose() string {
 
 // assigned is an assign's value, sometimes with operators.
 func (g *gen) assigned() string {
+	if g.odd(20) {
+		return g.braced()
+	}
 	if g.r.IntN(10) == 0 {
 		return g.loose()
 	}
@@ -445,7 +448,13 @@ func (g *gen) cond() string {
 	return c
 }
 
+// braced is an output nested in tag markup, which Ruby Liquid reads as its path.
+func (g *gen) braced() string { return "{{" + g.path() + "}}" }
+
 func (g *gen) cmp() string {
+	if g.odd(20) {
+		return g.braced()
+	}
 	kw := g.pick([]string{"blank", "empty"})
 	if g.r.IntN(2) == 0 {
 		if g.r.IntN(10) == 0 {

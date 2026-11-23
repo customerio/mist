@@ -435,7 +435,9 @@ func TestDialectRubyLax(t *testing.T) {
 		cond("a = 1"):          "dialect-ruby-operator",
 		cond("not a"):          "reserved-word-variable",
 		cond(`a == "x"y`):      "dialect-ruby-fragment",
-		cond(`a == 1 "x"`):     "dialect-ruby-skipped-quote",
+		cond(`a == 1 "x y"`):   "dialect-ruby-skipped-quote",
+		cond(`a == 1 "x"or b`): "dialect-ruby-skipped-quote",
+		cond(`a == 1 "x`):      "dialect-ruby-skipped-quote",
 		cond("and a"):          "dialect-ruby-and-or",
 		cond("a and"):          "dialect-ruby-and-or",
 		cond("a or, b"):        "dialect-ruby-and-or",
@@ -518,6 +520,71 @@ func TestDialectRubyGlued(t *testing.T) {
 	}
 	reads, all, err := e.Reads("{{ a==1 }}{{ xs==size }}{% if q==x %}{% endif %}")
 	if want := map[string][]string{"a": {"1"}, "xs": nil, "q": {"x"}}; err != nil || all || !reflect.DeepEqual(reads, want) {
+		t.Errorf("Reads: got %v, %v; want %v", reads, err, want)
+	}
+}
+
+// Outputs are Ruby Liquid 2.5 lax mode's.
+func TestDialectRubyNested(t *testing.T) {
+	e := Engine{Dialect: &Dialect{RubyLax: true, StrictAssign: true}}
+	data := map[string]any{
+		"a": map[string]any{"b": "x", "l": []any{1, 2, 3}, "t": true, "e": ""}, "k": map[string]any{"k": "v", "0": "z"},
+		"xs": []any{4, 5}, "c": "x", "s": "héllo",
+	}
+	for _, c := range []struct {
+		tpl    string
+		strict bool
+		want   string
+	}{
+		{"{% if {{a.b}} %}Y{% else %}N{% endif %}", false, "Y"},
+		{"{% if {{a.q}} %}Y{% else %}N{% endif %}", true, "N"},
+		{`{% if {{a.b}} == "x" and {{c}} != blank %}Y{% else %}N{% endif %}`, false, "Y"},
+		{"{% unless {{a.e}} == empty %}U{% endunless %}{% if false %}{% elsif {{a.t}} %}E{% endif %}", false, "E"},
+		{`{% if {{a.b | split: "," | first}} == "y" %}Y{% else %}N{% endif %}`, false, "Y"},
+		{`{% if {{k["k"]}} == "v" and {{a.l[1]}} == 2 %}Y{% else %}N{% endif %}`, false, "Y"},
+		{"{% if {{a.b}}x %}Y{% else %}N{% endif %}|{% if {a.t} %}Y{% endif %}|{% if a.t}} %}Y{% endif %}|{% if {{a.b %}Y{% endif %}", false, "N|Y|Y|Y"},
+		{"{% if {{xs.first}} == 4 and {{s.size}} == 5 %}Y{% endif %}", false, "Y"},
+		{"{% assign v = {{a.b}} %}{{ v }}|{% assign w = {{a.l.size}} | plus: 1 %}{{ w }}|{% assign u = {{k['0']}} %}{{ u }}", false, "x|4|z"},
+		{"{% assign v = {{q}} %}[{{ v }}]", false, "[]"},
+		{"{% case {{a.b}} %}{% when \"x\" %}X{% endcase %}|{% case c %}{% when {{q}}, {{a.b}} %}W{% endcase %}", false, "X|W"},
+		{"{% case {{q}} %}{% when nil %}W{% endcase %}|{% case c %}{% when {{q}} %}W{% else %}E{% endcase %}", true, "W|E"},
+		{"{% for i in {{a.l}} limit: 2 %}{{ i }}{% endfor %}|{% for i in {{q}} %}{% else %}E{% endfor %}", false, "12|E"},
+		{"{{ {{a.b}} }}", false, "x }}"},
+		{`{% if a.b == "x" "y" or false %}Y{% else %}N{% endif %}`, false, "Y"},
+	} {
+		if out, err := e.Render(c.tpl, data, c.strict); err != nil || out != c.want {
+			t.Errorf("%s (strict %v): got %q, %v; want %q", c.tpl, c.strict, out, err, c.want)
+		}
+	}
+	cond := func(c string) string { return "{% if " + c + " %}Y{% endif %}" }
+	for _, c := range []struct {
+		tpl    string
+		strict bool
+		code   string
+	}{
+		{"{% assign v = {{q}} %}", true, "dialect-ruby-fragment-undefined"},
+		{"{% for i in {{q}} %}{% endfor %}", true, "dialect-ruby-fragment-undefined"},
+		{cond("{{ a.b }}"), false, "dialect-ruby-fragment"},
+		{cond("{{1}}"), false, "dialect-ruby-fragment"},
+		{cond("{{-a}}"), false, "dialect-ruby-fragment"},
+		{cond("{{a.l[-1]}}"), false, "dialect-ruby-fragment"},
+		{cond("{{k[c]}}"), false, "dialect-ruby-fragment"},
+		{cond(`{{k["k]"]}}`), false, "dialect-ruby-fragment"},
+		{cond(`{{["a"]}}`), false, "dialect-ruby-fragment"},
+		{cond("{{a.l(1)}}"), false, "dialect-ruby-fragment"},
+		{cond("{{a.l[0}}"), false, "dialect-ruby-fragment"},
+		{cond("{{a.l[1234567890]}}"), false, "dialect-ruby-fragment"},
+		{cond("{{a.l.empty?}}"), false, "dialect-ruby-fragment"},
+		{"{% for x in xs %}{% if {{forloop.index}} %}Y{% endif %}{% endfor %}", false, "dialect-ruby-fragment"},
+	} {
+		_, err := e.Render(c.tpl, data, c.strict)
+		var me *Error
+		if !errors.As(err, &me) || me.Code != c.code {
+			t.Errorf("%s (strict %v): got %v; want %s", c.tpl, c.strict, err, c.code)
+		}
+	}
+	reads, all, err := e.Reads(`{% if {{a.b}} %}{% endif %}{% assign v = {{k["k"]}} %}{% for i in {{xs}} %}{% endfor %}`)
+	if want := map[string][]string{"a": {"b"}, "k": {"k"}, "xs": nil}; err != nil || all || !reflect.DeepEqual(reads, want) {
 		t.Errorf("Reads: got %v, %v; want %v", reads, err, want)
 	}
 }
