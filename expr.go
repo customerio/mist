@@ -355,7 +355,7 @@ func (r *renderer) rubyGlued(eval, lenient, glue bool) (v val, ok bool) {
 	}
 	f, at := s[:end], r.pos()
 	braced := strings.ContainsAny(f, "{}")
-	if !braced && !(glue && glued(f)) {
+	if !braced && (!glue || !glued(f)) {
 		return val{}, false
 	}
 	var pb [8]rubyPart
