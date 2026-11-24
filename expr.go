@@ -47,6 +47,14 @@ func (r *renderer) end() {
 	}
 }
 
+// delim ends a block delimiter tag. RubyLax drops its markup, as Ruby's block.rb does.
+func (r *renderer) delim() {
+	if r.rubyLax() {
+		r.p = len(r.src)
+	}
+	r.end()
+}
+
 func isIdentStart(c byte) bool { return identByte[c] == 2 }
 
 func isDigit(c byte) bool { return c >= '0' && c <= '9' }
