@@ -202,6 +202,43 @@ func TestDialectNoBuiltinFilters(t *testing.T) {
 	}
 }
 
+// With PassUnknownFilters, NoBuiltinFilters still passes through names liquidjs doesn't define.
+func TestDialectNoBuiltinFiltersPassUnknown(t *testing.T) {
+	e := Engine{
+		Dialect:            &Dialect{NoBuiltinFilters: true},
+		PassUnknownFilters: true,
+		Filters: map[string]FilterFunc{
+			"back": func(Filter) (any, error) { return nil, ErrBuiltin },
+			"cat":  func(f Filter) (any, error) { return f.Input.(string) + "c", nil },
+		},
+	}
+	vars := map[string]any{"x": "a"}
+	for _, tc := range []struct{ tpl, want string }{
+		{"{{ x | nope: 1, 'b' | cat }}", "ac"},
+		{"{% assign y = x | Upcase %}{{ y }}", "a"},
+		{"{{ missing | nope }}", ""},
+	} {
+		if out, err := e.Render(tc.tpl, vars, false); err != nil || out != tc.want {
+			t.Errorf("%s: got %q, %v; want %q", tc.tpl, out, err, tc.want)
+		}
+	}
+	if _, err := e.Render("{{ x | nope: missing }}", vars, true); !errors.Is(err, ErrUndefined) {
+		t.Errorf("strict undefined argument: got %v; want ErrUndefined", err)
+	}
+	for tpl, code := range map[string]string{"{{ x | upcase }}": "filter:upcase", "{{ x | back }}": "filter:back", "{{ x | default: 1 }}": "filter:default"} {
+		var me *Error
+		if _, err := e.Render(tpl, vars, false); !errors.As(err, &me) || me.Code != code {
+			t.Errorf("%s: got %v; want %s", tpl, err, code)
+		}
+	}
+	if err := e.Check("{{ x | upcase }}"); err == nil {
+		t.Error("Check upcase: got nil; want a bail")
+	}
+	if err := e.Check("{{ x | nope }}"); err != nil {
+		t.Errorf("Check: got %v", err)
+	}
+}
+
 // StrictAssign raises an undefined assign value under strict.
 func TestDialectStrictAssign(t *testing.T) {
 	tpl := "{% assign x = missing %}[{{ x }}]"
@@ -425,6 +462,14 @@ func TestDialectRubyLax(t *testing.T) {
 		"{% unless a == 1 t %}Y{% endunless %}{% if f %}{% elsif t 1 %}E{% endif %}": "E",
 		"{{ a b }}|{{ a, b }}|{{ a == 1 }}|{{ s junk | upcase }}":                    "1|1|1|X",
 		"{% assign x = a b %}{{ x }}{% assign y = s | upcase %}{{ y }}":              "1X",
+		// Block delimiters drop their markup.
+		"{% if t %}x{% endif; %}y{% if t %}x{% endif foo bar %}y{% if t %}x{% endif;%}y":                "xyxyxy",
+		`{% if t %}x{% endif "q %}y{% if t %}x{% endif 5% %}y`:                                          "xyxy",
+		"{% if f %}x{% else; %}z{% endif %}{% if f %}x{% else if t %}z{% endif %}":                      "zz",
+		"{% unless f %}x{% endunless; %}{% unless t %}x{% else; %}z{% endunless junk %}":                "xz",
+		"{% for i in (1..2) %}{{ i }}{% endfor; %}{% for i in n %}{% else junk %}none{% endfor junk %}": "12none",
+		"{% case a %}{% when 2 %}two{% else; %}other{% endcase; %}":                                     "other",
+		"{% capture c %}x{% endcapture; %}{{ c }}":                                                      "x",
 	} {
 		if out, err := e.Render(tpl, data, false); err != nil || out != want {
 			t.Errorf("%s: got %q, %v; want %q", tpl, out, err, want)
