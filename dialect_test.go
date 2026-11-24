@@ -425,6 +425,14 @@ func TestDialectRubyLax(t *testing.T) {
 		"{% unless a == 1 t %}Y{% endunless %}{% if f %}{% elsif t 1 %}E{% endif %}": "E",
 		"{{ a b }}|{{ a, b }}|{{ a == 1 }}|{{ s junk | upcase }}":                    "1|1|1|X",
 		"{% assign x = a b %}{{ x }}{% assign y = s | upcase %}{{ y }}":              "1X",
+		// Block delimiters drop their markup.
+		"{% if t %}x{% endif; %}y{% if t %}x{% endif foo bar %}y{% if t %}x{% endif;%}y":                "xyxyxy",
+		`{% if t %}x{% endif "q %}y{% if t %}x{% endif 5% %}y`:                                          "xyxy",
+		"{% if f %}x{% else; %}z{% endif %}{% if f %}x{% else if t %}z{% endif %}":                      "zz",
+		"{% unless f %}x{% endunless; %}{% unless t %}x{% else; %}z{% endunless junk %}":                "xz",
+		"{% for i in (1..2) %}{{ i }}{% endfor; %}{% for i in n %}{% else junk %}none{% endfor junk %}": "12none",
+		"{% case a %}{% when 2 %}two{% else; %}other{% endcase; %}":                                     "other",
+		"{% capture c %}x{% endcapture; %}{{ c }}":                                                      "x",
 	} {
 		if out, err := e.Render(tpl, data, false); err != nil || out != want {
 			t.Errorf("%s: got %q, %v; want %q", tpl, out, err, want)

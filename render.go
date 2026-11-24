@@ -375,7 +375,7 @@ func (r *renderer) tag(b, e, next int, lt, rt bool) (int, bool) {
 		f.active = r.fcond(eval)
 		f.taken = f.taken || f.active
 	case "else":
-		r.end()
+		r.delim()
 		f := r.top()
 		if f == nil || f.kind == kCapture || f.sawElse {
 			bail(b, "unexpected-block-tag", "unexpected else")
@@ -427,13 +427,13 @@ func (r *renderer) tag(b, e, next int, lt, rt bool) (int, bool) {
 		f.active = match
 		f.taken = f.taken || match
 	case "endcase":
-		r.end()
+		r.delim()
 		if f := r.top(); f == nil || f.kind != kCase {
 			bail(b, "unexpected-block-tag", "unexpected endcase")
 		}
 		r.depth--
 	case "endif", "endunless":
-		r.end()
+		r.delim()
 		want := kIf
 		if name == "endunless" {
 			want = kUnless
@@ -502,7 +502,7 @@ func (r *renderer) tag(b, e, next int, lt, rt bool) (int, bool) {
 			r.halt, r.haltBreak = i+1, name == "break"
 		}
 	case "endfor":
-		r.end()
+		r.delim()
 		f := r.top()
 		if f == nil || f.kind != kFor {
 			bail(b, "unexpected-block-tag", "unexpected endfor")
@@ -522,7 +522,7 @@ func (r *renderer) tag(b, e, next int, lt, rt bool) (int, bool) {
 		r.end()
 		r.push(frame{kind: kCapture, parentLive: live, active: true, body: len(r.out), name: v})
 	case "endcapture":
-		r.end()
+		r.delim()
 		f := r.top()
 		if f == nil || f.kind != kCapture {
 			bail(b, "unexpected-block-tag", "unexpected endcapture")
