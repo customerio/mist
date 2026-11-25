@@ -307,7 +307,8 @@ func (r *renderer) rubyCond(eval bool) bool {
 }
 
 // rubyValue is an output's or assign's value as Ruby's Variable reads it: the first
-// operand, then filters from the first |. Only an output folds a glued operand.
+// operand, then filters from the first |. Only an output folds a glued operand without
+// a brace.
 func (r *renderer) rubyValue(eval, lenient, fold bool) (val, bool, int) {
 	r.ws()
 	v := r.rubyOperand(eval, lenient, fold)
@@ -321,13 +322,12 @@ func (r *renderer) rubyValue(eval, lenient, fold bool) (val, bool, int) {
 }
 
 // rubyOperand is an operand that is exactly one Ruby QuotedFragment: it ends at a
-// blank, ',', '|' or the end, and holds no blank. With fold, a glued one is rubyGlued's.
+// blank, ',', '|' or the end, and holds no blank. A braced one, or with fold a glued
+// one, is rubyGlued's.
 func (r *renderer) rubyOperand(eval, lenient, fold bool) operand {
 	at := r.pos()
-	if fold {
-		if v, ok := r.rubyGlued(eval, lenient); ok {
-			return operand{v, at}
-		}
+	if v, ok := r.rubyGlued(eval, lenient, fold); ok {
+		return operand{v, at}
 	}
 	if !r.valueStart() {
 		bail(at, "dialect-ruby-fragment", "an operand Ruby reads differently")
@@ -344,28 +344,42 @@ func (r *renderer) rubyOperand(eval, lenient, fold bool) operand {
 func (r *renderer) laxExpr(eval, lenient bool) val {
 	if r.rubyLax() {
 		r.ws()
-		if v, ok := r.rubyGlued(eval, lenient); ok {
+		if v, ok := r.rubyGlued(eval, lenient, true); ok {
 			return v
 		}
 	}
 	return r.expr(eval, lenient)
 }
 
-// rubyGlued reads a glued operand at r.p (`a==1`, `a:b`, `a..b`) as Ruby's
+// rubyGlued reads a glued operand at r.p (`a==1`, `a:b`, `{{a.b}}`) as Ruby's
 // Context#variable does: its [\w-]+\?? runs are a lookup, the first a variable and the
-// rest keys, or size, first or last. ok is false, consuming nothing, for any other operand.
-func (r *renderer) rubyGlued(eval, lenient bool) (v val, ok bool) {
+// rest keys, or size, first or last. A fragment holding a brace also reads its ["k"] and
+// [0] subscripts, and needs no glue. ok is false, consuming nothing, for any other operand.
+func (r *renderer) rubyGlued(eval, lenient, glue bool) (v val, ok bool) {
 	start, s := r.p, r.src[r.p:]
 	end := rubyFragmentEnd(s)
-	if end < 0 || !glued(s[:end]) {
+	if end < 0 {
 		return val{}, false
 	}
 	f, at := s[:end], r.pos()
-	var rb [8]string
-	runs := rb[:0]
+	braced := strings.ContainsAny(f, "{}")
+	if !braced && (!glue || !glued(f)) {
+		return val{}, false
+	}
+	var pb [8]rubyPart
+	parts := pb[:0]
 	for i := 0; i < len(f); {
 		c := f[i]
 		switch {
+		case c >= utf8.RuneSelf || strings.IndexByte("]()\\", c) >= 0:
+			bail(at, "dialect-ruby-fragment", "an operand Ruby reads differently")
+		case c == '[':
+			j := strings.IndexByte(f[i:], ']')
+			if j < 0 || len(parts) == 0 {
+				bail(at, "dialect-ruby-fragment", "an operand Ruby reads differently")
+			}
+			parts = append(parts, rubySubscript(f[i+1:i+j], at))
+			i += j + 1
 		case rubyWord(c):
 			j := i + 1
 			for j < len(f) && rubyWord(f[j]) {
@@ -374,30 +388,35 @@ func (r *renderer) rubyGlued(eval, lenient bool) (v val, ok bool) {
 			if j < len(f) && f[j] == '?' {
 				j++
 			}
-			runs = append(runs, f[i:j])
+			k := f[i:j]
+			parts = append(parts, rubyPart{val{s: k, lit: litStr}, magic(k)})
 			i = j
 		default:
 			i++
 		}
 	}
-	name := runs[0]
-	if name == "forloop" || slices.Contains(runs[1:], "empty?") {
+	if len(parts) == 0 || !isIdentStart(parts[0].k.s[0]) {
+		bail(at, "dialect-ruby-fragment", "an operand Ruby reads differently")
+	}
+	name := parts[0].k.s
+	if name == "forloop" || slices.ContainsFunc(parts[1:], func(p rubyPart) bool { return p.k.lit == litStr && p.k.s == "empty?" }) {
 		bail(at, "dialect-ruby-fragment", "an operand Ruby reads differently")
 	}
 	r.p = start + end
 	r.afterUndef = false
-	if len(runs) == 1 {
+	if len(parts) == 1 {
 		r.read(name, "", true)
 	} else {
-		r.read(name, runs[1], runs[1] == "size")
+		k := parts[1].k
+		r.read(name, k.s, k.lit != litStr || k.s == "size")
 	}
 	if !eval {
 		return val{}, true
 	}
 	x := r.root(name, start)
 	falsy := x == nil || x == false
-	for i, k := range runs[1:] {
-		x = segment(x, val{s: k, lit: litStr}, at, true, falsy, i, magic(k))
+	for i, p := range parts[1:] {
+		x = segment(x, p.k, at, true, falsy, i, p.dot)
 	}
 	if r.strict && x == (Undefined{}) {
 		if !lenient {
@@ -406,6 +425,24 @@ func (r *renderer) rubyGlued(eval, lenient bool) (v val, ok bool) {
 		x, r.lenientUndef = nil, true
 	}
 	return val{x: x}, true
+}
+
+// rubyPart is one key of a glued operand's lookup; dot marks a size, first or last run.
+type rubyPart struct {
+	k   val
+	dot bool
+}
+
+// rubySubscript is a glued operand's [k], for a quoted k or a non-negative integer.
+func rubySubscript(k string, at int) rubyPart {
+	if len(k) >= 2 && (k[0] == '"' || k[0] == '\'') && k[len(k)-1] == k[0] && !strings.ContainsAny(k[1:len(k)-1], "[\"'") {
+		return rubyPart{val{s: k[1 : len(k)-1], lit: litStr}, false}
+	}
+	if k == "" || len(k) > 9 || strings.Trim(k, "0123456789") != "" {
+		bail(at, "dialect-ruby-fragment", "an operand Ruby reads differently")
+	}
+	n, _ := strconv.Atoi(k)
+	return rubyPart{val{x: boxInt(n)}, false}
 }
 
 // rubyFragmentEnd is the length of the Ruby QuotedFragment s starts with, or -1 where
@@ -522,7 +559,13 @@ func (r *renderer) rubyJunk() {
 		}
 		for ; r.p < len(r.src) && !isBlank(r.src[r.p]); r.p++ {
 			if c := r.src[r.p]; c == '"' || c == '\'' {
-				bail(r.pos(), "dialect-ruby-skipped-quote", "a quote in text Ruby skips")
+				// Ruby skips a quoted string whole, splitting on and/or glued after it, so
+				// only a blank-free one that ends the token splits alike.
+				k := strings.IndexByte(r.src[r.p+1:], c)
+				if e := r.p + k + 2; k < 0 || strings.ContainsAny(r.src[r.p+1:e-1], " \t\n\v\f\r") || e < len(r.src) && !isBlank(r.src[e]) {
+					bail(r.pos(), "dialect-ruby-skipped-quote", "a quote in text Ruby skips")
+				}
+				r.p += k + 1
 			}
 		}
 	}
